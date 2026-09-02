@@ -5,6 +5,21 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
 export function AuthNav() {
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    return (
+      <Link
+        href="/sign-in"
+        className="inline-flex h-10 items-center rounded-lg bg-sky px-3 text-sm font-semibold text-navy transition hover:bg-sky-dark hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+      >
+        Sign in
+      </Link>
+    );
+  }
+
+  return <ClerkAuthNav />;
+}
+
+function ClerkAuthNav() {
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded) {

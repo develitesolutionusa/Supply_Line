@@ -1,11 +1,18 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 import { isProtectedPath } from "@/lib/auth/paths";
 
-export default clerkMiddleware(async (auth, request) => {
-  if (isProtectedPath(request.nextUrl.pathname)) {
-    await auth.protect();
-  }
-});
+const clerkEnabled = Boolean(process.env.CLERK_SECRET_KEY);
+
+export default clerkEnabled
+  ? clerkMiddleware(async (auth, request) => {
+      if (isProtectedPath(request.nextUrl.pathname)) {
+        await auth.protect();
+      }
+    })
+  : function proxy() {
+      return NextResponse.next();
+    };
 
 export const config = {
   matcher: [

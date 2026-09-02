@@ -29,7 +29,9 @@ export type StoreShape = {
   users: StoredUser[];
 };
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+const DATA_DIR = process.env.VERCEL
+  ? path.join("/tmp", "supply-line-data")
+  : path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
 
 const emptyStore = (): StoreShape => ({
