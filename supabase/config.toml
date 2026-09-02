@@ -1,0 +1,11 @@
+-- Project id is filled in by `supabase link`. Keep this file so the CLI has a config root.
+project_id = "supply-line"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[db.migrations]
+schema_paths = []
