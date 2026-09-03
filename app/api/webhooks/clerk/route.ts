@@ -1,14 +1,15 @@
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { NextResponse, type NextRequest } from "next/server";
-import { withPublicRateLimit } from "@/lib/http";
 import { upsertClerkOrg, upsertClerkUser } from "@/lib/sync/clerk";
 
 export async function POST(request: NextRequest) {
-  const limited = withPublicRateLimit(request, "clerk-webhook");
-  if (limited) return limited;
-
   try {
-    const event = await verifyWebhook(request);
+    const signingSecret =
+      process.env.CLERK_WEBHOOK_SIGNING_SECRET || process.env.CLERK_WEBHOOK_SECRET;
+    if (!signingSecret) {
+      throw new Error("Missing Clerk webhook signing secret");
+    }
+    const event = await verifyWebhook(request, { signingSecret });
     console.info("[clerk webhook]", { type: event.type });
 
     if (event.type === "user.created" || event.type === "user.updated") {
