@@ -1,12 +1,13 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { isProtectedPath } from "@/lib/auth/paths";
+import { isProtectedApiRequest, isProtectedPath } from "@/lib/auth/paths";
 
 const clerkEnabled = Boolean(process.env.CLERK_SECRET_KEY);
 
 export default clerkEnabled
   ? clerkMiddleware(async (auth, request) => {
-      if (isProtectedPath(request.nextUrl.pathname)) {
+      const pathname = request.nextUrl.pathname;
+      if (isProtectedPath(pathname) || isProtectedApiRequest(pathname, request.method)) {
         await auth.protect();
       }
     })

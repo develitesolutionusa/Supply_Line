@@ -190,7 +190,7 @@ This file is the build guide for any agent (human or AI) working on this codebas
 - [x] Create Clerk project, configure OAuth providers if desired, set up Organizations feature
 - [x] Create Stripe account (test mode), get API keys, install Stripe CLI locally for webhook forwarding
 - [x] Set up `.env.local` with all keys (Supabase URL/anon/service role, Clerk publishable/secret, Stripe publishable/secret/webhook secret)
-- [ ] Configure Vercel project with environment variables (separate for preview/production)
+- [ ] Configure Vercel project with environment variables (separate for preview/production) — CLI user cannot write team `solutions13`
 - [x] Set up Supabase CLI locally, link project, establish migration workflow
 
 **Done when:** `supabase db push` and `next dev` both run clean with all services connected.
@@ -230,14 +230,14 @@ Tables to create (in dependency order):
 **Goal:** Clerk identities are synced to Supabase, and Row-Level Security enforces data isolation.
 
 - [x] Clerk webhook handler (`/api/webhooks/clerk`) for `user.created`, `user.updated`, `organization.created` → upsert into `users` / `business_accounts`
-- [x] Middleware (`middleware.ts`) protecting `/checkout`, `/account/*`, `/admin/*`, and all mutating API routes
+- [x] Middleware (`proxy.ts`) protecting `/checkout`, `/account/*`, `/admin/*`, and all mutating / signed-in API routes
 - [x] Supabase RLS policies:
   - `cart_items`/`carts`: user can only read/write their own cart
   - `orders`/`order_items`: user can only read their own orders (or their business account's orders); admin role bypasses
   - `business_accounts`: user can only read/update their own account
   - `products`/`categories`/`inventory`: public read, admin-only write
 - [x] Server-side role check helper (`lib/auth/requireRole.ts`) used in every admin API route in addition to RLS (defense in depth)
-- [ ] Test RLS policies directly against Supabase (not just through the app) to confirm they can't be bypassed
+- [x] Test RLS policies directly against Supabase (not just through the app) to confirm they can't be bypassed
 
 **Done when:** A buyer authenticated via Clerk cannot read or mutate another business account's cart, orders, or account data — verified by direct API/DB tests.
 
@@ -325,14 +325,14 @@ Tables to create (in dependency order):
 ## Phase B8 — Hardening & Observability
 **Goal:** Production readiness.
 
-- [ ] Sentry (or equivalent) wired into both frontend and API routes
-- [x] Rate limiting on public/auth-adjacent routes (search, sign-up-adjacent webhooks) — Upstash Redis or Vercel-native
+- [x] Sentry (or equivalent) wired into both frontend and API routes
+- [x] Rate limiting on public/auth-adjacent routes (search, sign-up-adjacent webhooks) — in-process limiter (swap for Upstash if multi-instance)
 - [x] Structured logging on all webhook handlers (Stripe, Clerk) — these fail silently in production if unmonitored
 - [x] Automated tests:
   - Unit tests on `lib/pricing.ts` (tier boundaries, business vs retail, tax-exempt cases) — highest priority, highest cost-of-bug area
   - [ ] Integration tests on checkout flow using Stripe test clocks/test cards
-  - [ ] RLS policy tests (attempt cross-account reads, expect denial)
-- [ ] Load-test the catalog search and admin metrics endpoints before launch
+  - [x] RLS policy tests (attempt cross-account reads, expect denial)
+- [x] Load-test the catalog search and admin metrics endpoints before launch
 - [ ] Backup/retention policy confirmed on Supabase project
 - [ ] Staging environment mirrors production config, used for final QA before each release
 

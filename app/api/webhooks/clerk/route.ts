@@ -1,8 +1,12 @@
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { NextResponse, type NextRequest } from "next/server";
+import { withPublicRateLimit } from "@/lib/http";
 import { upsertClerkOrg, upsertClerkUser } from "@/lib/sync/clerk";
 
 export async function POST(request: NextRequest) {
+  const limited = withPublicRateLimit(request, "clerk-webhook");
+  if (limited) return limited;
+
   try {
     const event = await verifyWebhook(request);
     console.info("[clerk webhook]", { type: event.type });
