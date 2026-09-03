@@ -3,13 +3,9 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getOrder, getOrderByPaymentIntent, markOrderPaid, markOrderPaymentFailed } from "@/lib/orders/service";
 import { sendOrderConfirmation } from "@/lib/email";
-import { withPublicRateLimit } from "@/lib/http";
 import { getStripe } from "@/lib/stripe/server";
 
 export async function POST(request: Request) {
-  const limited = withPublicRateLimit(request, "stripe-webhook");
-  if (limited) return limited;
-
   const stripe = getStripe();
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!stripe || !secret) {

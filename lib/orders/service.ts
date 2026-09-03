@@ -3,8 +3,15 @@ import { getCartSnapshot, clearCart } from "@/lib/cart/service";
 import { DELIVERY_METHODS, resolveCasePrice } from "@/lib/pricing";
 import { ensureAppUser, ensureBusinessAccount } from "@/lib/supabase/identity";
 import { assertNoError, createServiceClient } from "@/lib/supabase/server";
-import { assertStatusTransition } from "@/lib/orders/status";
 import type { AccountTier, AddressRecord, OrderRecord, OrderStatus } from "@/types/commerce";
+
+const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
+  pending: ["paid", "cancelled", "payment_failed"],
+  paid: ["fulfilled", "cancelled"],
+  fulfilled: [],
+  cancelled: [],
+  payment_failed: ["pending", "cancelled"],
+};
 
 type OrderRow = {
   id: string;
@@ -40,7 +47,11 @@ type OrderItemRow = {
   products: { sku: string; name: string } | { sku: string; name: string }[] | null;
 };
 
-export { assertStatusTransition };
+export function assertStatusTransition(from: OrderStatus, to: OrderStatus) {
+  if (!ALLOWED[from].includes(to)) {
+    throw new Error(`Cannot move order from ${from} to ${to}`);
+  }
+}
 
 async function mapOrder(row: OrderRow): Promise<OrderRecord> {
   const supabase = createServiceClient();

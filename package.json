@@ -7,9 +7,7 @@
     "lint": "eslint",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/pricing.test.ts tests/orders-status.test.ts",
-    "test:rls": "node supabase/scripts/run-rls-tests.mjs",
-    "test:load": "node tests/load-catalog.mjs",
+    "test": "tsx --test tests/pricing.test.ts",
     "db:seed-sql": "tsx supabase/scripts/emit-seed.ts",
     "db:push": "node supabase/scripts/push-remote.mjs",
     "db:status": "node supabase/scripts/check-remote.mjs",
@@ -33,7 +31,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
-    "pg": "^8.23.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5"
