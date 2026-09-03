@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { getCartSnapshot, clearCart } from "@/lib/cart/service";
+import { notifyIfLowStockBreached } from "@/lib/inventory/alerts";
 import { DELIVERY_METHODS, resolveCasePrice } from "@/lib/pricing";
 import { ensureAppUser, ensureBusinessAccount } from "@/lib/supabase/identity";
+import { syncClerkIdentity } from "@/lib/sync/clerk";
 import { assertNoError, createServiceClient } from "@/lib/supabase/server";
 import type { AccountTier, AddressRecord, OrderRecord, OrderStatus } from "@/types/commerce";
 
@@ -137,11 +139,10 @@ export async function placeOrder(options: {
   }
 
   const supabase = createServiceClient();
-  const user = await ensureAppUser(options.userId);
-  const business = options.orgId ? await ensureBusinessAccount(options.orgId) : null;
-  if (business && user.business_account_id !== business.id) {
-    await supabase.from("users").update({ business_account_id: business.id }).eq("id", user.id);
-  }
+  const { user, account: business } = await syncClerkIdentity({
+    clerkUserId: options.userId,
+    clerkOrgId: options.orgId,
+  });
 
   if (options.address.is_default) {
     await supabase.from("addresses").update({ is_default: false }).eq("user_id", user.id);
@@ -180,6 +181,7 @@ export async function placeOrder(options: {
     .select("*")
     .single();
   assertNoError(orderError, "Could not create order");
+  if (!order) throw new Error("Could not create order");
 
   const { error: itemsError } = await supabase.from("order_items").insert(
     cart.items.map((item) => ({
@@ -225,19 +227,32 @@ export async function markOrderPaid(orderId: string) {
   for (const item of items ?? []) {
     const { data: inventoryRows, error: inventoryError } = await supabase
       .from("inventory")
-      .select("id, quantity_on_hand")
+      .select("id, quantity_on_hand, low_stock_threshold, product_id")
       .eq("product_id", item.product_id);
     assertNoError(inventoryError, "Could not load inventory");
+    const { data: product } = await supabase
+      .from("products")
+      .select("sku, name")
+      .eq("id", item.product_id)
+      .maybeSingle();
     let remaining = item.cases as number;
     for (const row of inventoryRows ?? []) {
       if (remaining <= 0) break;
       const take = Math.min(row.quantity_on_hand, remaining);
+      const nextQuantity = Math.max(0, row.quantity_on_hand - take);
       const { error: updateError } = await supabase
         .from("inventory")
-        .update({ quantity_on_hand: Math.max(0, row.quantity_on_hand - take) })
+        .update({ quantity_on_hand: nextQuantity })
         .eq("id", row.id);
       assertNoError(updateError, "Could not decrement inventory");
       remaining -= take;
+      await notifyIfLowStockBreached({
+        sku: product?.sku ?? item.product_id,
+        name: product?.name,
+        previousQuantity: row.quantity_on_hand,
+        nextQuantity,
+        threshold: row.low_stock_threshold,
+      });
     }
   }
 

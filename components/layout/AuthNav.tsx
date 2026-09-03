@@ -3,6 +3,7 @@
 import { OrganizationSwitcher, SignOutButton, useAuth, useOrganization, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import { isBusinessAccountType } from "@/lib/auth/accountType";
 
 export function AuthNav() {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
@@ -77,8 +78,8 @@ function SignedInAccountMenu() {
 
   const displayName =
     user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress || "Account";
-  const orgName = organization?.name;
-  const accountType = user?.unsafeMetadata?.accountType;
+  const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType);
+  const orgName = isBusiness ? organization?.name : undefined;
 
   return (
     <div ref={rootRef} className="relative">
@@ -96,7 +97,7 @@ function SignedInAccountMenu() {
         <span className="hidden min-w-0 sm:block">
           <span className="block truncate text-sm font-medium text-white">{displayName}</span>
           <span className="block truncate text-[11px] text-slate-300">
-            {orgName ?? (accountType === "business" ? "No company yet" : "Individual")}
+            {orgName ?? (isBusiness ? "No company yet" : "Individual")}
           </span>
         </span>
       </button>
@@ -112,20 +113,24 @@ function SignedInAccountMenu() {
             <p className="truncate text-xs text-slate-500">
               {user?.primaryEmailAddress?.emailAddress}
             </p>
-            <div className="mt-3">
-              <OrganizationSwitcher
-                hidePersonal={false}
-                afterCreateOrganizationUrl="/"
-                afterSelectOrganizationUrl="/"
-                appearance={{
-                  elements: {
-                    rootBox: "w-full",
-                    organizationSwitcherTrigger:
-                      "w-full justify-between rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-navy",
-                  },
-                }}
-              />
-            </div>
+            {isBusiness ? (
+              <div className="mt-3">
+                <OrganizationSwitcher
+                  hidePersonal
+                  afterCreateOrganizationUrl="/"
+                  afterSelectOrganizationUrl="/"
+                  appearance={{
+                    elements: {
+                      rootBox: "w-full",
+                      organizationSwitcherTrigger:
+                        "w-full justify-between rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-navy",
+                    },
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-slate-500">Individual account · retail pricing</p>
+            )}
           </div>
           <Link
             href="/account/orders"
@@ -153,7 +158,7 @@ function SignedInAccountMenu() {
               Admin
             </Link>
           ) : null}
-          {accountType === "business" && !organization ? (
+          {isBusiness && !organization ? (
             <Link
               href="/create-organization"
               role="menuitem"

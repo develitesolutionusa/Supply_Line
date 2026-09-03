@@ -220,7 +220,7 @@ Tables to create (in dependency order):
 - [x] Add indexes: `products(sku)`, `products(category_id)`, full-text index on `products(name)`, `orders(user_id)`, `orders(status)`
 - [x] Add foreign key constraints and `ON DELETE` behavior for every relation
 - [x] Seed script: 10 categories, 18–50 demo products with tiers and inventory (port from prototype `PRODUCTS` array)
-- [x] Generate TypeScript types from schema (`supabase gen types typescript`)
+- [x] Generate TypeScript types from schema (`npm run db:types` — live public schema; regenerate after migrations)
 
 **Done when:** Fresh `supabase db reset` + seed produces a fully populated dev database matching the prototype's demo catalog.
 
@@ -229,15 +229,15 @@ Tables to create (in dependency order):
 ## Phase B2 — Auth Integration & RLS
 **Goal:** Clerk identities are synced to Supabase, and Row-Level Security enforces data isolation.
 
-- [x] Clerk webhook handler (`/api/webhooks/clerk`) for `user.created`, `user.updated`, `organization.created` → upsert into `users` / `business_accounts`
-- [x] Middleware (`middleware.ts`) protecting `/checkout`, `/account/*`, `/admin/*`, and all mutating API routes
+- [x] Clerk webhook handler (`/api/webhooks/clerk`) for `user.created`, `user.updated`, `organization.created`, `organizationMembership.*` → upsert into `users` / `business_accounts` and link `users.business_account_id`
+- [x] Middleware (`proxy.ts`) protecting `/checkout`, `/account/*`, `/admin/*`, and mutating APIs (`/api/cart`, `/api/checkout`, `/api/orders`, `/api/account`, `/api/admin`, `/api/quick-order`) — unauthenticated API calls return JSON 401
 - [x] Supabase RLS policies:
   - `cart_items`/`carts`: user can only read/write their own cart
-  - `orders`/`order_items`: user can only read their own orders (or their business account's orders); admin role bypasses
+  - `orders`/`order_items`: user can only read/insert their own orders (or their business account's orders); admin role bypasses
   - `business_accounts`: user can only read/update their own account
   - `products`/`categories`/`inventory`: public read, admin-only write
 - [x] Server-side role check helper (`lib/auth/requireRole.ts`) used in every admin API route in addition to RLS (defense in depth)
-- [ ] Test RLS policies directly against Supabase (not just through the app) to confirm they can't be bypassed
+- [x] Test RLS policies directly against Supabase (not just through the app) to confirm they can't be bypassed (`npm run db:rls`)
 
 **Done when:** A buyer authenticated via Clerk cannot read or mutate another business account's cart, orders, or account data — verified by direct API/DB tests.
 
@@ -311,12 +311,12 @@ Tables to create (in dependency order):
 - [x] `GET /api/admin/inventory/low-stock` — products at/below threshold
 - [x] `GET /api/admin/products/top` — top sellers by cases sold, from `order_items` aggregation
 - [x] Product CRUD: `POST/PATCH/DELETE /api/admin/products`, including price tier management
-- [x] `POST /api/admin/products/[id]/image` — image upload to Supabase Storage, returns public URL
+- [x] `POST /api/admin/products/[id]/image` — image upload to Supabase Storage (`product-images` bucket), returns public URL
 - [x] Inventory adjustment: `PATCH /api/admin/inventory/[id]`
-- [x] Order management: `GET /api/admin/orders` (all orders, filterable by status), `PATCH /api/admin/orders/[id]/status`
+- [x] Order management: `GET /api/admin/orders` (all orders, filterable by status), `PATCH .../status`
 - [x] Business account management: `GET /api/admin/business-accounts`, `PATCH .../tax-exempt`
 - [x] Every admin route double-checks `role = admin` server-side (never trust RLS alone for admin-sensitive aggregate reads that might bypass row-level scoping)
-- [x] Email integration (Resend/Postmark): order confirmation on `payment_intent.succeeded`, low-stock alert to admins on threshold breach
+- [x] Email integration (Resend): order confirmation on `payment_intent.succeeded`, low-stock alert to `ADMIN_ALERT_EMAIL` on threshold breach
 
 **Done when:** Frontend Phase F7 runs entirely on real data with no mock arrays remaining.
 
@@ -331,7 +331,7 @@ Tables to create (in dependency order):
 - [x] Automated tests:
   - Unit tests on `lib/pricing.ts` (tier boundaries, business vs retail, tax-exempt cases) — highest priority, highest cost-of-bug area
   - [ ] Integration tests on checkout flow using Stripe test clocks/test cards
-  - [ ] RLS policy tests (attempt cross-account reads, expect denial)
+  - [x] RLS policy tests (attempt cross-account reads, expect denial)
 - [ ] Load-test the catalog search and admin metrics endpoints before launch
 - [ ] Backup/retention policy confirmed on Supabase project
 - [ ] Staging environment mirrors production config, used for final QA before each release

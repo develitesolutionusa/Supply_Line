@@ -1,4 +1,7 @@
 import { CreateOrganization } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { isBusinessAccountType } from "@/lib/auth/accountType";
 import { requireUser } from "@/lib/auth/requireUser";
 
 export const metadata = {
@@ -7,6 +10,10 @@ export const metadata = {
 
 export default async function CreateOrganizationPage() {
   await requireUser();
+  const user = await currentUser();
+  if (!isBusinessAccountType(user?.unsafeMetadata?.accountType)) {
+    redirect("/account");
+  }
 
   return (
     <div className="mx-auto max-w-lg px-4 py-12 sm:px-6">

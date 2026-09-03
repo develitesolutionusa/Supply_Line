@@ -1,6 +1,8 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import type { AccountTier } from "@/types/commerce";
-import { getBusinessAccountByClerkOrg } from "@/lib/supabase/identity";
+import { isBusinessAccountType, resolveAccountType } from "@/lib/auth/accountType";
+import { syncClerkIdentity } from "@/lib/sync/clerk";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export type AccountContext = {
   userId: string | null;
@@ -12,30 +14,38 @@ export type AccountContext = {
   fullName: string | null;
 };
 
-export async function getAccountContext(): Promise<AccountContext> {
-  const { userId, orgId } = await auth();
-  const user = userId ? await currentUser() : null;
-  const accountType = user?.unsafeMetadata?.accountType;
-  const accountTier: AccountTier =
-    orgId || accountType === "business" ? "business" : "individual";
-
-  const adminIds = (process.env.ADMIN_USER_IDS ?? "")
+function adminIdList() {
+  return (process.env.ADMIN_USER_IDS ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+export async function getAccountContext(): Promise<AccountContext> {
+  const { userId, orgId } = await auth();
+  const user = userId ? await currentUser() : null;
+  const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType);
+  const accountTier: AccountTier = isBusiness ? "business" : "individual";
+  const activeOrgId = isBusiness ? (orgId ?? null) : null;
+
   const isAdmin =
     user?.publicMetadata?.role === "admin" ||
-    (userId ? adminIds.includes(userId) : false);
+    (userId ? adminIdList().includes(userId) : false);
 
   let taxExempt = false;
-  if (orgId) {
-    const account = await getBusinessAccountByClerkOrg(orgId);
-    taxExempt = account?.tax_exempt ?? false;
+  if (userId && isSupabaseConfigured()) {
+    const synced = await syncClerkIdentity({
+      clerkUserId: userId,
+      email: user?.primaryEmailAddress?.emailAddress ?? null,
+      clerkOrgId: activeOrgId,
+      role: isAdmin ? "admin" : undefined,
+    });
+    taxExempt = isBusiness ? (synced.account?.tax_exempt ?? false) : false;
   }
 
   return {
     userId: userId ?? null,
-    orgId: orgId ?? null,
+    orgId: activeOrgId,
     accountTier,
     taxExempt,
     isAdmin,
@@ -43,3 +53,5 @@ export async function getAccountContext(): Promise<AccountContext> {
     fullName: user?.fullName ?? null,
   };
 }
+
+export { resolveAccountType, isBusinessAccountType };

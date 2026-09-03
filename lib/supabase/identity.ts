@@ -136,3 +136,24 @@ export async function linkUserToBusinessAccount(userId: string, businessAccountI
   const { error } = await supabase.from("users").update({ business_account_id: businessAccountId }).eq("id", userId);
   assertNoError(error, "Could not link user to business account");
 }
+
+export async function unlinkUserFromBusinessAccount(clerkUserId: string, businessAccountId: string) {
+  const user = await ensureAppUser(clerkUserId);
+  if (user.business_account_id !== businessAccountId) return;
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("users")
+    .update({ business_account_id: null })
+    .eq("id", user.id)
+    .eq("business_account_id", businessAccountId);
+  assertNoError(error, "Could not unlink user from business account");
+}
+
+export async function setBusinessStripeCustomerId(accountId: string, stripeCustomerId: string) {
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("business_accounts")
+    .update({ stripe_customer_id: stripeCustomerId })
+    .eq("id", accountId);
+  assertNoError(error, "Could not save Stripe customer");
+}

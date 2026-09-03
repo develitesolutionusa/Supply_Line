@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { catalogTables, hydrateProduct } from "@/lib/catalog/query";
+import { notifyIfLowStockBreached } from "@/lib/inventory/alerts";
 import { deriveStockStatus } from "@/lib/pricing";
 import { assertNoError, createServiceClient, DEFAULT_WAREHOUSE_ID } from "@/lib/supabase/server";
 import type { OrderStatus, PriceTier, Product } from "@/types/commerce";
@@ -175,8 +176,14 @@ export async function adjustInventory(productId: string, quantityOnHand: number)
     throw new Error("quantity_on_hand must be a non-negative integer");
   }
   const supabase = createServiceClient();
-  const { data: existing, error } = await supabase.from("inventory").select("id").eq("product_id", productId).limit(1);
+  const { data: existing, error } = await supabase
+    .from("inventory")
+    .select("id, quantity_on_hand, low_stock_threshold")
+    .eq("product_id", productId)
+    .limit(1);
   assertNoError(error, "Could not load inventory");
+  const previousQuantity = existing?.[0]?.quantity_on_hand ?? 0;
+  const threshold = existing?.[0]?.low_stock_threshold ?? 5;
   if (existing?.[0]) {
     const { error: updateError } = await supabase
       .from("inventory")
@@ -195,6 +202,13 @@ export async function adjustInventory(productId: string, quantityOnHand: number)
   const { products } = await catalogTables();
   const product = products.find((item) => item.id === productId);
   if (!product) throw new Error("Product not found");
+  await notifyIfLowStockBreached({
+    sku: product.sku,
+    name: product.name,
+    previousQuantity,
+    nextQuantity: quantityOnHand,
+    threshold,
+  });
   return {
     product_id: productId,
     quantity_on_hand: quantityOnHand,

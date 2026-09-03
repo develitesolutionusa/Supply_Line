@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getOrder, getOrderByPaymentIntent, markOrderPaid, markOrderPaymentFailed } from "@/lib/orders/service";
 import { sendOrderConfirmation } from "@/lib/email";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
 
 export async function POST(request: Request) {
@@ -36,7 +37,13 @@ export async function POST(request: Request) {
       const order = orderId ? await getOrder(orderId) : await getOrderByPaymentIntent(intent.id);
       if (order) {
         const paid = await markOrderPaid(order.id);
-        await sendOrderConfirmation(paid.id, null);
+        const supabase = createServiceClient();
+        const { data: buyer } = await supabase
+          .from("users")
+          .select("email")
+          .eq("clerk_user_id", paid.user_id)
+          .maybeSingle();
+        await sendOrderConfirmation(paid, buyer?.email ?? null);
       }
     }
     if (event.type === "payment_intent.payment_failed") {

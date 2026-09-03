@@ -1,6 +1,7 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { AddressBook } from "@/components/account/AddressBook";
+import { resolveAccountType } from "@/lib/auth/accountType";
 import { getAccountContext } from "@/lib/auth/context";
 import { requireUser } from "@/lib/auth/requireUser";
 import { listAddresses } from "@/lib/orders/service";
@@ -12,12 +13,12 @@ export const metadata = {
 export default async function AccountPage() {
   await requireUser();
   const account = await getAccountContext();
-  const [user, { orgId }, addresses] = await Promise.all([
+  const [user, addresses] = await Promise.all([
     currentUser(),
-    auth(),
     account.userId ? listAddresses(account.userId) : Promise.resolve([]),
   ]);
-  const accountType = user?.unsafeMetadata?.accountType ?? "individual";
+  const accountType = resolveAccountType(user?.unsafeMetadata?.accountType);
+  const isBusiness = accountType === "business";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
@@ -36,14 +37,18 @@ export default async function AccountPage() {
           <dt className="text-sm font-medium text-slate-500">Account type</dt>
           <dd className="text-sm capitalize text-navy">{accountType}</dd>
         </div>
-        <div className="grid gap-1 px-5 py-4 sm:grid-cols-[10rem_1fr]">
-          <dt className="text-sm font-medium text-slate-500">Organization</dt>
-          <dd className="text-sm text-navy">{orgId ? orgId : "Personal / none yet"}</dd>
-        </div>
-        <div className="grid gap-1 px-5 py-4 sm:grid-cols-[10rem_1fr]">
-          <dt className="text-sm font-medium text-slate-500">Tax-exempt</dt>
-          <dd className="text-sm text-navy">{account.taxExempt ? "Yes" : "No"}</dd>
-        </div>
+        {isBusiness ? (
+          <div className="grid gap-1 px-5 py-4 sm:grid-cols-[10rem_1fr]">
+            <dt className="text-sm font-medium text-slate-500">Organization</dt>
+            <dd className="text-sm text-navy">{account.orgId ? account.orgId : "No company yet"}</dd>
+          </div>
+        ) : null}
+        {isBusiness ? (
+          <div className="grid gap-1 px-5 py-4 sm:grid-cols-[10rem_1fr]">
+            <dt className="text-sm font-medium text-slate-500">Tax-exempt</dt>
+            <dd className="text-sm text-navy">{account.taxExempt ? "Yes" : "No"}</dd>
+          </div>
+        ) : null}
         <div className="grid gap-1 px-5 py-4 sm:grid-cols-[10rem_1fr]">
           <dt className="text-sm font-medium text-slate-500">Pricing tier</dt>
           <dd className="text-sm capitalize text-navy">{account.accountTier}</dd>
@@ -56,7 +61,7 @@ export default async function AccountPage() {
         >
           My orders
         </Link>
-        {accountType === "business" && !orgId ? (
+        {isBusiness && !account.orgId ? (
           <Link
             href="/create-organization"
             className="inline-flex h-11 items-center rounded-lg border border-slate-200 bg-white px-5 text-sm font-semibold text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"

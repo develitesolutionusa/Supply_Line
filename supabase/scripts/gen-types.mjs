@@ -1,0 +1,265 @@
+import { writeFileSync } from "node:fs";
+import pg from "pg";
+import { encodedDatabaseUrl } from "./with-db-url.mjs";
+
+const PG_TO_TS = {
+  uuid: "string",
+  text: "string",
+  varchar: "string",
+  bpchar: "string",
+  name: "string",
+  citext: "string",
+  bool: "boolean",
+  boolean: "boolean",
+  int2: "number",
+  int4: "number",
+  int8: "string",
+  float4: "number",
+  float8: "number",
+  numeric: "number",
+  json: "Json",
+  jsonb: "Json",
+  date: "string",
+  time: "string",
+  timetz: "string",
+  timestamp: "string",
+  timestamptz: "string",
+  bytea: "string",
+};
+
+function mapType(row, enums) {
+  if (row.typtype === "e" || enums.has(row.typname)) {
+    return `Database["public"]["Enums"]["${row.typname}"]`;
+  }
+  const base = row.typname.replace(/\[\]$/, "");
+  const ts = PG_TO_TS[base] ?? "string";
+  return row.typname.endsWith("[]") ? `${ts}[]` : ts;
+}
+
+function ident(name) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : JSON.stringify(name);
+}
+
+function asList(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    return value.replace(/^{|}$/g, "").split(",").filter(Boolean);
+  }
+  return [];
+}
+
+function optionalInsert(row) {
+  return row.nullable || row.has_default || row.identity === "d" || row.identity === "a";
+}
+
+const { url } = encodedDatabaseUrl();
+const client = new pg.Client({
+  connectionString: url,
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 15000,
+  query_timeout: 20000,
+});
+await client.connect();
+
+try {
+  const enumsRes = await client.query(`
+    select t.typname as name, e.enumlabel as label, e.enumsortorder as sort
+    from pg_type t
+    join pg_enum e on t.oid = e.enumtypid
+    join pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public'
+    order by t.typname, e.enumsortorder
+  `);
+  const enums = new Map();
+  for (const row of enumsRes.rows) {
+    const labels = enums.get(row.name) ?? [];
+    labels.push(row.label);
+    enums.set(row.name, labels);
+  }
+
+  const colsRes = await client.query(`
+    select
+      c.relname as table_name,
+      a.attname as column_name,
+      a.attnum,
+      not a.attnotnull as nullable,
+      a.atthasdef as has_default,
+      a.attidentity as identity,
+      t.typtype,
+      t.typname,
+      pg_get_expr(ad.adbin, ad.adrelid) as column_default
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_type t on t.oid = a.atttypid
+    left join pg_attrdef ad on ad.adrelid = a.attrelid and ad.adnum = a.attnum
+    where n.nspname = 'public'
+      and c.relkind = 'r'
+      and a.attnum > 0
+      and not a.attisdropped
+    order by c.relname, a.attnum
+  `);
+
+  const tables = new Map();
+  for (const row of colsRes.rows) {
+    const cols = tables.get(row.table_name) ?? [];
+    cols.push(row);
+    tables.set(row.table_name, cols);
+  }
+
+  const fkRes = await client.query(`
+    select
+      con.conname as constraint_name,
+      rel.relname as table_name,
+      array_agg(att.attname order by u.ord) as columns,
+      frel.relname as foreign_table,
+      array_agg(fatt.attname order by u.ord) as foreign_columns,
+      con.contype
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace n on n.oid = rel.relnamespace
+    join pg_class frel on frel.oid = con.confrelid
+    join unnest(con.conkey) with ordinality as u(attnum, ord) on true
+    join pg_attribute att on att.attrelid = con.conrelid and att.attnum = u.attnum
+    join unnest(con.confkey) with ordinality as fu(attnum, ord) on fu.ord = u.ord
+    join pg_attribute fatt on fatt.attrelid = con.confrelid and fatt.attnum = fu.attnum
+    where n.nspname = 'public'
+      and con.contype = 'f'
+    group by con.conname, rel.relname, frel.relname, con.contype
+    order by rel.relname, con.conname
+  `);
+
+  const uniqueRes = await client.query(`
+    select rel.relname as table_name, array_agg(att.attname order by u.ord) as columns
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace n on n.oid = rel.relnamespace
+    join unnest(con.conkey) with ordinality as u(attnum, ord) on true
+    join pg_attribute att on att.attrelid = con.conrelid and att.attnum = u.attnum
+    where n.nspname = 'public'
+      and con.contype in ('u', 'p')
+    group by rel.relname, con.conname
+  `);
+  const uniqueKeys = new Set(
+    uniqueRes.rows.map((row) => `${row.table_name}:${asList(row.columns).join(",")}`),
+  );
+
+  const fnRes = await client.query(`
+    select
+      p.proname as name,
+      pg_get_function_identity_arguments(p.oid) as args,
+      pg_get_function_result(p.oid) as result
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prokind = 'f'
+      and p.proname in ('current_app_user', 'is_admin')
+    order by p.proname
+  `);
+
+  const lines = [];
+  lines.push("/* eslint-disable */");
+  lines.push("/**");
+  lines.push(" * Generated by `npm run db:types` from the live public schema.");
+  lines.push(" * Same source of truth as `supabase gen types typescript --schema public`.");
+  lines.push(" * Do not edit by hand — regenerate after migrations.");
+  lines.push(" */");
+  lines.push("");
+  lines.push(
+    "export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];",
+  );
+  lines.push("");
+  lines.push("export type Database = {");
+  lines.push("  public: {");
+  lines.push("    Tables: {");
+
+  for (const [table, cols] of tables) {
+    lines.push(`      ${ident(table)}: {`);
+    lines.push("        Row: {");
+    for (const col of cols) {
+      const ts = mapType(col, enums);
+      lines.push(`          ${ident(col.column_name)}: ${ts}${col.nullable ? " | null" : ""}`);
+    }
+    lines.push("        }");
+    lines.push("        Insert: {");
+    for (const col of cols) {
+      const ts = mapType(col, enums);
+      const opt = optionalInsert(col) ? "?" : "";
+      const nullUnion = col.nullable ? " | null" : "";
+      lines.push(`          ${ident(col.column_name)}${opt}: ${ts}${nullUnion}`);
+    }
+    lines.push("        }");
+    lines.push("        Update: {");
+    for (const col of cols) {
+      const ts = mapType(col, enums);
+      const nullUnion = col.nullable ? " | null" : "";
+      lines.push(`          ${ident(col.column_name)}?: ${ts}${nullUnion}`);
+    }
+    lines.push("        }");
+    const rels = fkRes.rows.filter((row) => row.table_name === table);
+    if (rels.length === 0) {
+      lines.push("        Relationships: []");
+    } else {
+      lines.push("        Relationships: [");
+      for (const rel of rels) {
+        const cols = asList(rel.columns);
+        const foreignCols = asList(rel.foreign_columns);
+        const oneToOne = uniqueKeys.has(`${rel.table_name}:${cols.join(",")}`);
+        lines.push("          {");
+        lines.push(`            foreignKeyName: ${JSON.stringify(rel.constraint_name)}`);
+        lines.push(`            columns: ${JSON.stringify(cols)}`);
+        lines.push(`            isOneToOne: ${oneToOne}`);
+        lines.push(`            referencedRelation: ${JSON.stringify(rel.foreign_table)}`);
+        lines.push(`            referencedColumns: ${JSON.stringify(foreignCols)}`);
+        lines.push("          },");
+      }
+      lines.push("        ]");
+    }
+    lines.push("      }");
+  }
+
+  lines.push("    }");
+  lines.push("    Views: { [_ in never]: never }");
+  lines.push("    Functions: {");
+  for (const fn of fnRes.rows) {
+    const result = fn.result.includes("users")
+      ? 'Database["public"]["Tables"]["users"]["Row"]'
+      : fn.result.toLowerCase().includes("boolean")
+        ? "boolean"
+        : "unknown";
+    lines.push(`      ${ident(fn.name)}: { Args: Record<PropertyKey, never>; Returns: ${result} }`);
+  }
+  lines.push("    }");
+  lines.push("    Enums: {");
+  for (const [name, labels] of enums) {
+    lines.push(`      ${ident(name)}: ${labels.map((label) => JSON.stringify(label)).join(" | ")}`);
+  }
+  lines.push("    }");
+  lines.push("    CompositeTypes: { [_ in never]: never }");
+  lines.push("  }");
+  lines.push("}");
+  lines.push("");
+  lines.push("type PublicSchema = Database[Extract<keyof Database, \"public\">]");
+  lines.push("");
+  lines.push("export type Tables<T extends keyof PublicSchema[\"Tables\"]> = PublicSchema[\"Tables\"][T][\"Row\"]");
+  lines.push(
+    "export type TablesInsert<T extends keyof PublicSchema[\"Tables\"]> = PublicSchema[\"Tables\"][T][\"Insert\"]",
+  );
+  lines.push(
+    "export type TablesUpdate<T extends keyof PublicSchema[\"Tables\"]> = PublicSchema[\"Tables\"][T][\"Update\"]",
+  );
+  lines.push("export type Enums<T extends keyof PublicSchema[\"Enums\"]> = PublicSchema[\"Enums\"][T]");
+  lines.push("");
+
+  writeFileSync(new URL("../../types/database.ts", import.meta.url), `${lines.join("\n")}\n`);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      file: "types/database.ts",
+      tables: [...tables.keys()],
+      enums: [...enums.keys()],
+    }),
+  );
+} finally {
+  await client.end();
+}

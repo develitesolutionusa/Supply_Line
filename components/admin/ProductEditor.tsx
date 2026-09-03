@@ -80,7 +80,12 @@ export function ProductEditor({
     body.set("file", file);
     const response = await fetch(`/api/admin/products/${product.id}/image`, { method: "POST", body });
     const data = await response.json();
-    if (response.ok) setForm((current) => ({ ...current, image_url: data.image_url }));
+    if (response.ok) {
+      setError(null);
+      setForm((current) => ({ ...current, image_url: data.image_url }));
+    } else {
+      setError(data.error ?? "Image upload failed");
+    }
   }
 
   return (

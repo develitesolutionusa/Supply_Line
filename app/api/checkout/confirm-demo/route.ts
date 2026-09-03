@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAccountContext } from "@/lib/auth/context";
+import { sendOrderConfirmation } from "@/lib/email";
 import { getOrder, markOrderPaid } from "@/lib/orders/service";
 import { stripeConfigured } from "@/lib/stripe/server";
 
@@ -27,5 +28,6 @@ export async function POST(request: Request) {
   }
 
   const paid = await markOrderPaid(order.id);
+  await sendOrderConfirmation(paid, account.email);
   return NextResponse.json({ order: paid });
 }
