@@ -7,7 +7,7 @@
     "lint": "eslint",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/pricing.test.ts tests/orders-status.test.ts tests/auth-paths.test.ts tests/account-type.test.ts tests/database-types.test.ts tests/inventory-alerts.test.ts",
+    "test": "tsx --test tests/pricing.test.ts tests/orders-status.test.ts tests/auth-paths.test.ts tests/account-type.test.ts tests/database-types.test.ts tests/inventory-alerts.test.ts tests/admin-email.test.ts",
     "db:seed-sql": "tsx supabase/scripts/emit-seed.ts",
     "db:push": "node supabase/scripts/push-remote.mjs",
     "db:status": "node supabase/scripts/check-remote.mjs",

@@ -4,6 +4,7 @@ import { OrganizationSwitcher, SignOutButton, useAuth, useOrganization, useUser 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { isBusinessAccountType } from "@/lib/auth/accountType";
+import { hasAdminLoginEmail } from "@/lib/auth/admin";
 
 export function AuthNav() {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
@@ -80,6 +81,10 @@ function SignedInAccountMenu() {
     user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress || "Account";
   const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType);
   const orgName = isBusiness ? organization?.name : undefined;
+  const isAdmin = hasAdminLoginEmail([
+    user?.primaryEmailAddress?.emailAddress,
+    ...(user?.emailAddresses?.map((address) => address.emailAddress) ?? []),
+  ]);
 
   return (
     <div ref={rootRef} className="relative">
@@ -148,7 +153,7 @@ function SignedInAccountMenu() {
           >
             Account
           </Link>
-          {user?.publicMetadata?.role === "admin" ? (
+          {isAdmin ? (
             <Link
               href="/admin"
               role="menuitem"

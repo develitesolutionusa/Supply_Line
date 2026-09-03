@@ -6,6 +6,7 @@ import {
   upsertClerkOrg,
   upsertClerkUser,
 } from "@/lib/sync/clerk";
+import { isAdminLoginEmail } from "@/lib/auth/admin";
 
 type MembershipPayload = {
   organization?: { id?: string; name?: string };
@@ -41,11 +42,15 @@ export async function POST(request: NextRequest) {
           ?.email_address ??
         event.data.email_addresses[0]?.email_address ??
         "";
-      const role = event.data.public_metadata?.role;
+      const role = isAdminLoginEmail(email)
+        ? "admin"
+        : event.data.public_metadata?.role === "staff" || event.data.public_metadata?.role === "buyer"
+          ? event.data.public_metadata.role
+          : undefined;
       await upsertClerkUser({
         clerkUserId: event.data.id,
         email,
-        role: role === "admin" || role === "staff" || role === "buyer" ? role : undefined,
+        role,
       });
     }
 

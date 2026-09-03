@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import type { AccountTier } from "@/types/commerce";
 import { isBusinessAccountType, resolveAccountType } from "@/lib/auth/accountType";
+import { hasAdminLoginEmail } from "@/lib/auth/admin";
 import { syncClerkIdentity } from "@/lib/sync/clerk";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
@@ -14,29 +15,23 @@ export type AccountContext = {
   fullName: string | null;
 };
 
-function adminIdList() {
-  return (process.env.ADMIN_USER_IDS ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
 export async function getAccountContext(): Promise<AccountContext> {
   const { userId, orgId } = await auth();
   const user = userId ? await currentUser() : null;
   const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType);
   const accountTier: AccountTier = isBusiness ? "business" : "individual";
   const activeOrgId = isBusiness ? (orgId ?? null) : null;
-
-  const isAdmin =
-    user?.publicMetadata?.role === "admin" ||
-    (userId ? adminIdList().includes(userId) : false);
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
+  const isAdmin = hasAdminLoginEmail([
+    email,
+    ...(user?.emailAddresses?.map((address) => address.emailAddress) ?? []),
+  ]);
 
   let taxExempt = false;
   if (userId && isSupabaseConfigured()) {
     const synced = await syncClerkIdentity({
       clerkUserId: userId,
-      email: user?.primaryEmailAddress?.emailAddress ?? null,
+      email,
       clerkOrgId: activeOrgId,
       role: isAdmin ? "admin" : undefined,
     });
@@ -49,7 +44,7 @@ export async function getAccountContext(): Promise<AccountContext> {
     accountTier,
     taxExempt,
     isAdmin,
-    email: user?.primaryEmailAddress?.emailAddress ?? null,
+    email,
     fullName: user?.fullName ?? null,
   };
 }

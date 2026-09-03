@@ -4,7 +4,7 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
 import { loadStripe } from "@stripe/stripe-js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StepIndicator } from "@/components/ui/StepIndicator";
 import { emitCartUpdated } from "@/lib/cart/client";
 import { DELIVERY_METHODS, formatCents } from "@/lib/pricing";
@@ -15,6 +15,8 @@ const STEPS = ["Customer", "Shipping", "Delivery", "Payment", "Review"];
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+const STRIPE_APPEARANCE = { theme: "stripe" as const };
+const PAYMENT_ELEMENT_OPTIONS = { layout: "tabs" as const };
 
 type Line = {
   id?: string;
@@ -316,105 +318,87 @@ export function CheckoutWizard() {
         </fieldset>
       ) : null}
 
-      {step === 3 ? (
-        <div className="mt-8 space-y-4">
-          {paymentMode === "stripe" && clientSecret ? (
-            <PaymentElement options={{ layout: "tabs" }} />
-          ) : (
-            <div className="rounded-lg border border-slate-200 bg-canvas p-4 text-sm text-slate-700">
-              <p className="font-medium text-navy">Stripe Payment Element</p>
-              <p className="mt-2">
-                Stripe keys are not configured, so a card form is not shown. Place order will record a
-                paid demo order so catalog, cart, reorder, and admin can be tested. Add Stripe test
-                keys to embed the real Payment Element.
-              </p>
-            </div>
-          )}
+      {step === 3 && paymentMode === "stripe" && clientSecret && order ? (
+        <div className="mt-8 space-y-6">
+          <CheckoutReview
+            name={name}
+            email={email}
+            address={address}
+            delivery={delivery}
+            lines={lines}
+          />
+          <StripePaymentForm
+            clientSecret={clientSecret}
+            orderId={order.id}
+            onError={setError}
+            onBack={() => setStep(2)}
+          />
+        </div>
+      ) : null}
+
+      {step === 3 && paymentMode !== "stripe" ? (
+        <div className="mt-8 rounded-lg border border-slate-200 bg-canvas p-4 text-sm text-slate-700">
+          <p className="font-medium text-navy">Stripe Payment Element</p>
+          <p className="mt-2">
+            Stripe keys are not configured, so a card form is not shown. Place order will record a
+            paid demo order so catalog, cart, reorder, and admin can be tested. Add Stripe test keys
+            to embed the real Payment Element.
+          </p>
         </div>
       ) : null}
 
       {step === 4 ? (
-        <div className="mt-8 space-y-4 text-sm">
-          <p>
-            <span className="font-medium text-navy">{name}</span> · {email}
-          </p>
-          <p className="text-slate-600">
-            {address.line1}, {address.city}, {address.state} {address.zip}
-          </p>
-          <p className="text-slate-600">
-            Delivery: {DELIVERY_METHODS.find((item) => item.id === delivery)?.label ?? delivery}
-          </p>
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-            {lines.map((item, index) => {
-              const label = item.name ?? item.product?.name ?? item.sku ?? `Item ${index + 1}`;
-              const total =
-                item.unit_price_cents_at_purchase != null
-                  ? item.unit_price_cents_at_purchase * item.cases
-                  : (item.line_total_cents ?? 0);
-              return (
-                <li key={item.id ?? item.sku ?? index} className="flex justify-between px-4 py-3">
-                  <span>
-                    {label} × {item.cases}
-                  </span>
-                  <span>{formatCents(total)}</span>
-                </li>
-              );
-            })}
-          </ul>
+        <div className="mt-8">
+          <CheckoutReview
+            name={name}
+            email={email}
+            address={address}
+            delivery={delivery}
+            lines={lines}
+          />
         </div>
       ) : null}
 
       {error ? <p className="mt-4 text-sm text-rose-700">{error}</p> : null}
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        {step > 0 ? (
-          <button
-            type="button"
-            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-            onClick={() => setStep((value) => value - 1)}
-          >
-            Back
-          </button>
-        ) : null}
-        {step < 4 ? (
-          <button
-            type="button"
-            disabled={pending}
-            className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
-            onClick={() => void goNext()}
-          >
-            {pending ? "Working…" : step === 2 ? "Continue to payment" : "Continue"}
-          </button>
-        ) : paymentMode === "stripe" && clientSecret && order ? (
-          <StripeConfirmButton
-            orderId={order.id}
-            onError={setError}
-          />
-        ) : (
-          <button
-            type="button"
-            disabled={pending}
-            className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
-            onClick={() => void placeDemoOrder()}
-          >
-            {pending ? "Placing order…" : "Place order"}
-          </button>
-        )}
-      </div>
+      {step === 3 && paymentMode === "stripe" ? null : (
+        <div className="mt-8 flex flex-wrap gap-3">
+          {step > 0 ? (
+            <button
+              type="button"
+              className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+              onClick={() => setStep((value) => value - 1)}
+            >
+              Back
+            </button>
+          ) : null}
+          {step < 4 ? (
+            <button
+              type="button"
+              disabled={pending}
+              className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
+              onClick={() => void goNext()}
+            >
+              {pending ? "Working…" : step === 2 ? "Continue to payment" : "Continue"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
+              onClick={() => void placeDemoOrder()}
+            >
+              {pending ? "Placing order…" : "Place order"}
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        {paymentMode === "stripe" && clientSecret && stripePromise ? (
-          <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
-            {body}
-          </Elements>
-        ) : (
-          body
-        )}
-      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-6">{body}</div>
       <aside className="h-fit rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-navy">Order total</h2>
         <p className="mt-1 text-xs text-slate-500">Calculated on the server from live cart prices.</p>
@@ -518,23 +502,102 @@ function AddressFields({
   );
 }
 
-function StripeConfirmButton({
+function CheckoutReview({
+  name,
+  email,
+  address,
+  delivery,
+  lines,
+}: {
+  name: string;
+  email: string;
+  address: AddressDraft;
+  delivery: string;
+  lines: Line[];
+}) {
+  return (
+    <div className="space-y-4 text-sm">
+      <p>
+        <span className="font-medium text-navy">{name}</span> · {email}
+      </p>
+      <p className="text-slate-600">
+        {address.line1}, {address.city}, {address.state} {address.zip}
+      </p>
+      <p className="text-slate-600">
+        Delivery: {DELIVERY_METHODS.find((item) => item.id === delivery)?.label ?? delivery}
+      </p>
+      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        {lines.map((item, index) => {
+          const label = item.name ?? item.product?.name ?? item.sku ?? `Item ${index + 1}`;
+          const total =
+            item.unit_price_cents_at_purchase != null
+              ? item.unit_price_cents_at_purchase * item.cases
+              : (item.line_total_cents ?? 0);
+          return (
+            <li key={item.id ?? item.sku ?? index} className="flex justify-between px-4 py-3">
+              <span>
+                {label} × {item.cases}
+              </span>
+              <span>{formatCents(total)}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function StripePaymentForm({
+  clientSecret,
   orderId,
   onError,
+  onBack,
+}: {
+  clientSecret: string;
+  orderId: string;
+  onError: (message: string | null) => void;
+  onBack: () => void;
+}) {
+  const options = useMemo(
+    () => ({ clientSecret, appearance: STRIPE_APPEARANCE }),
+    [clientSecret],
+  );
+
+  if (!stripePromise) {
+    return <p className="text-sm text-rose-700">Stripe is not configured.</p>;
+  }
+
+  return (
+    <Elements stripe={stripePromise} options={options}>
+      <StripePaymentFields orderId={orderId} onError={onError} onBack={onBack} />
+    </Elements>
+  );
+}
+
+function StripePaymentFields({
+  orderId,
+  onError,
+  onBack,
 }: {
   orderId: string;
-  onError: (message: string) => void;
+  onError: (message: string | null) => void;
+  onBack: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
+  const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
 
-  async function onPay() {
-    if (!stripe || !elements) {
-      onError("Payment form is still loading.");
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!stripe || !elements || !ready) {
+      onError("Payment form is still loading. Please wait a moment and try again.");
       return;
     }
+
     setPending(true);
+    onError(null);
+
     const result = await stripe.confirmPayment({
       elements,
       confirmParams: {
@@ -542,22 +605,38 @@ function StripeConfirmButton({
       },
       redirect: "if_required",
     });
+
     if (result.error) {
       onError(result.error.message ?? "Your card was declined.");
       setPending(false);
       return;
     }
+
     window.location.href = `/checkout/confirmation?order=${orderId}`;
   }
 
   return (
-    <button
-      type="button"
-      disabled={pending || !stripe}
-      className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
-      onClick={() => void onPay()}
-    >
-      {pending ? "Processing…" : "Place order"}
-    </button>
+    <form className="space-y-6" onSubmit={(event) => void onSubmit(event)}>
+      <div>
+        <p className="mb-3 text-sm font-medium text-navy">Payment method</p>
+        <PaymentElement options={PAYMENT_ELEMENT_OPTIONS} onReady={() => setReady(true)} />
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+          onClick={onBack}
+        >
+          Back
+        </button>
+        <button
+          type="submit"
+          disabled={pending || !stripe || !ready}
+          className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
+        >
+          {pending ? "Processing…" : ready ? "Place order" : "Loading payment…"}
+        </button>
+      </div>
+    </form>
   );
 }

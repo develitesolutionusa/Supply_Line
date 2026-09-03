@@ -19,5 +19,4 @@ export const FOOTER_ACCOUNT_LINKS = [
   { href: "/account", label: "Account" },
   { href: "/account/orders", label: "My orders" },
   { href: "/checkout", label: "Checkout" },
-  { href: "/admin", label: "Admin" },
 ] as const;

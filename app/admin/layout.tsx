@@ -11,8 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="text-2xl font-semibold text-navy">Admin access required</h1>
         <p className="mt-3 text-sm text-slate-600">
-          This area is limited to users with <code>publicMetadata.role = admin</code> or an ID listed in{" "}
-          <code>ADMIN_USER_IDS</code>.
+          This area is only available when you sign in with the designated admin email.
         </p>
       </div>
     );
