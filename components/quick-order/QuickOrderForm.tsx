@@ -90,7 +90,7 @@ export function QuickOrderForm() {
                           ),
                         )
                       }
-                      placeholder="BEV-COLA-24"
+                      placeholder="PLS-DELI-32"
                     />
                     {result && !result.ok ? (
                       <p className="mt-1 text-xs text-rose-700">{result.reason}</p>

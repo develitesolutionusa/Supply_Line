@@ -1,8 +1,42 @@
-import { randomUUID } from "node:crypto";
 import { getProductById, getProductBySku } from "@/lib/catalog/query";
 import { calculateCartTotals, resolveCasePrice } from "@/lib/pricing";
-import { mutateStore, readStoreLocked } from "@/lib/store/file-store";
+import { ensureAppUser } from "@/lib/supabase/identity";
+import { assertNoError, createServiceClient } from "@/lib/supabase/server";
 import type { AccountTier, CartItemRecord } from "@/types/commerce";
+
+async function getOrCreateCart(clerkUserId: string) {
+  const supabase = createServiceClient();
+  const user = await ensureAppUser(clerkUserId);
+  const { data: existing, error } = await supabase.from("carts").select("id, user_id").eq("user_id", user.id).maybeSingle();
+  assertNoError(error, "Could not load cart");
+  if (existing) return { user, cart: existing };
+
+  const { data, error: insertError } = await supabase
+    .from("carts")
+    .insert({ user_id: user.id })
+    .select("id, user_id")
+    .single();
+  if (insertError?.code === "23505") {
+    const { data: raced, error: racedError } = await supabase
+      .from("carts")
+      .select("id, user_id")
+      .eq("user_id", user.id)
+      .single();
+    assertNoError(racedError, "Could not load cart");
+    if (!raced) throw new Error("Could not load cart");
+    return { user, cart: raced };
+  }
+  assertNoError(insertError, "Could not create cart");
+  if (!data) throw new Error("Could not create cart");
+  return { user, cart: data };
+}
+
+async function listCartItems(cartId: string): Promise<CartItemRecord[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("cart_items").select("id, product_id, cases").eq("cart_id", cartId);
+  assertNoError(error, "Could not load cart items");
+  return (data ?? []) as CartItemRecord[];
+}
 
 export async function getCartSnapshot(options: {
   userId: string;
@@ -11,8 +45,8 @@ export async function getCartSnapshot(options: {
   deliveryMethodId?: string;
   shippingState?: string;
 }) {
-  const store = await readStoreLocked();
-  const items = store.carts[options.userId] ?? [];
+  const { cart } = await getOrCreateCart(options.userId);
+  const items = await listCartItems(cart.id);
   const deliveryMethodId = options.deliveryMethodId ?? "standard";
 
   const resolved = [];
@@ -49,25 +83,47 @@ export async function upsertCartItem(userId: string, productId: string, cases: n
     throw new Error("Cases must be a positive integer.");
   }
 
-  return mutateStore((store) => {
-    const current = store.carts[userId] ?? [];
-    const existing = current.find((item) => item.product_id === productId);
-    if (existing) {
-      existing.cases = cases;
-    } else {
-      const next: CartItemRecord = { id: randomUUID(), product_id: productId, cases };
-      current.push(next);
-    }
-    store.carts[userId] = current;
-    return store.carts[userId];
-  });
+  const supabase = createServiceClient();
+  const { cart } = await getOrCreateCart(userId);
+  const { data: existing, error } = await supabase
+    .from("cart_items")
+    .select("id, product_id, cases")
+    .eq("cart_id", cart.id)
+    .eq("product_id", productId)
+    .maybeSingle();
+  assertNoError(error, "Could not load cart item");
+
+  if (existing) {
+    const { data, error: updateError } = await supabase
+      .from("cart_items")
+      .update({ cases })
+      .eq("id", existing.id)
+      .select("id, product_id, cases")
+      .single();
+    assertNoError(updateError, "Could not update cart item");
+    return data as CartItemRecord;
+  }
+
+  const { data, error: insertError } = await supabase
+    .from("cart_items")
+    .insert({ cart_id: cart.id, product_id: productId, cases })
+    .select("id, product_id, cases")
+    .single();
+  assertNoError(insertError, "Could not add cart item");
+  return data as CartItemRecord;
 }
 
 export async function addCasesToCart(userId: string, productId: string, cases: number) {
-  const store = await readStoreLocked();
-  const existing = (store.carts[userId] ?? []).find((item) => item.product_id === productId);
-  const nextCases = (existing?.cases ?? 0) + cases;
-  return upsertCartItem(userId, productId, nextCases);
+  const supabase = createServiceClient();
+  const { cart } = await getOrCreateCart(userId);
+  const { data: existing, error } = await supabase
+    .from("cart_items")
+    .select("id, cases")
+    .eq("cart_id", cart.id)
+    .eq("product_id", productId)
+    .maybeSingle();
+  assertNoError(error, "Could not load cart item");
+  return upsertCartItem(userId, productId, (existing?.cases ?? 0) + cases);
 }
 
 export async function updateCartItem(userId: string, itemId: string, cases: number) {
@@ -75,26 +131,32 @@ export async function updateCartItem(userId: string, itemId: string, cases: numb
     throw new Error("Cases must be a positive integer.");
   }
 
-  return mutateStore((store) => {
-    const current = store.carts[userId] ?? [];
-    const item = current.find((entry) => entry.id === itemId);
-    if (!item) throw new Error("Cart item not found.");
-    item.cases = cases;
-    store.carts[userId] = current;
-    return item;
-  });
+  const supabase = createServiceClient();
+  const { cart } = await getOrCreateCart(userId);
+  const { data, error } = await supabase
+    .from("cart_items")
+    .update({ cases })
+    .eq("id", itemId)
+    .eq("cart_id", cart.id)
+    .select("id, product_id, cases")
+    .maybeSingle();
+  assertNoError(error, "Could not update cart item");
+  if (!data) throw new Error("Cart item not found.");
+  return data as CartItemRecord;
 }
 
 export async function removeCartItem(userId: string, itemId: string) {
-  return mutateStore((store) => {
-    store.carts[userId] = (store.carts[userId] ?? []).filter((item) => item.id !== itemId);
-  });
+  const supabase = createServiceClient();
+  const { cart } = await getOrCreateCart(userId);
+  const { error } = await supabase.from("cart_items").delete().eq("id", itemId).eq("cart_id", cart.id);
+  assertNoError(error, "Could not remove cart item");
 }
 
 export async function clearCart(userId: string) {
-  return mutateStore((store) => {
-    store.carts[userId] = [];
-  });
+  const supabase = createServiceClient();
+  const { cart } = await getOrCreateCart(userId);
+  const { error } = await supabase.from("cart_items").delete().eq("cart_id", cart.id);
+  assertNoError(error, "Could not clear cart");
 }
 
 export async function bulkAddBySku(

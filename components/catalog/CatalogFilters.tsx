@@ -60,6 +60,9 @@ export function CategorySidebar({
 
   return (
     <nav aria-label="Categories" className="space-y-1">
+      <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Categories
+      </p>
       <Link
         href={hrefFor()}
         className={`block rounded-md px-3 py-2 text-sm ${

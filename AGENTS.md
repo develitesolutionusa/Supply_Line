@@ -186,12 +186,12 @@ This file is the build guide for any agent (human or AI) working on this codebas
 ## Phase B0 — Infrastructure Setup
 **Goal:** All external services provisioned and connected.
 
-- [ ] Create Supabase project, note connection strings, enable Postgres extensions needed (`pg_trgm` for search, `uuid-ossp`)
+- [x] Create Supabase project, note connection strings, enable Postgres extensions needed (`pg_trgm` for search, `uuid-ossp`)
 - [x] Create Clerk project, configure OAuth providers if desired, set up Organizations feature
-- [ ] Create Stripe account (test mode), get API keys, install Stripe CLI locally for webhook forwarding
+- [x] Create Stripe account (test mode), get API keys, install Stripe CLI locally for webhook forwarding
 - [x] Set up `.env.local` with all keys (Supabase URL/anon/service role, Clerk publishable/secret, Stripe publishable/secret/webhook secret)
 - [ ] Configure Vercel project with environment variables (separate for preview/production)
-- [ ] Set up Supabase CLI locally, link project, establish migration workflow
+- [x] Set up Supabase CLI locally, link project, establish migration workflow
 
 **Done when:** `supabase db push` and `next dev` both run clean with all services connected.
 

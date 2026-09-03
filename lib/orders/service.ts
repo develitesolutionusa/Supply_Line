@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { PRODUCTS } from "@/lib/catalog/seed";
-import { getCartSnapshot } from "@/lib/cart/service";
-import { DELIVERY_METHODS } from "@/lib/pricing";
-import { resolveCasePrice } from "@/lib/pricing";
-import { mutateStore, readStoreLocked } from "@/lib/store/file-store";
+import { getCartSnapshot, clearCart } from "@/lib/cart/service";
+import { DELIVERY_METHODS, resolveCasePrice } from "@/lib/pricing";
+import { ensureAppUser, ensureBusinessAccount } from "@/lib/supabase/identity";
+import { assertNoError, createServiceClient } from "@/lib/supabase/server";
 import type { AccountTier, AddressRecord, OrderRecord, OrderStatus } from "@/types/commerce";
 
 const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
@@ -14,10 +13,103 @@ const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
   payment_failed: ["pending", "cancelled"],
 };
 
+type OrderRow = {
+  id: string;
+  user_id: string;
+  business_account_id: string | null;
+  status: OrderStatus;
+  subtotal_cents: number;
+  shipping_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  stripe_payment_intent_id: string | null;
+  delivery_method: string;
+  shipping_address_id: string | null;
+  created_at: string;
+};
+
+type AddressRow = {
+  id: string;
+  user_id: string | null;
+  label: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  zip: string;
+  is_default: boolean;
+};
+
+type OrderItemRow = {
+  product_id: string;
+  cases: number;
+  unit_price_cents_at_purchase: number;
+  products: { sku: string; name: string } | { sku: string; name: string }[] | null;
+};
+
 export function assertStatusTransition(from: OrderStatus, to: OrderStatus) {
   if (!ALLOWED[from].includes(to)) {
     throw new Error(`Cannot move order from ${from} to ${to}`);
   }
+}
+
+async function mapOrder(row: OrderRow): Promise<OrderRecord> {
+  const supabase = createServiceClient();
+  const [{ data: user }, { data: account }, { data: address }, { data: items }] = await Promise.all([
+    supabase.from("users").select("clerk_user_id").eq("id", row.user_id).maybeSingle(),
+    row.business_account_id
+      ? supabase.from("business_accounts").select("clerk_org_id").eq("id", row.business_account_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    row.shipping_address_id
+      ? supabase
+          .from("addresses")
+          .select("id, user_id, label, line1, line2, city, state, zip, is_default")
+          .eq("id", row.shipping_address_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("order_items")
+      .select("product_id, cases, unit_price_cents_at_purchase, products(sku, name)")
+      .eq("order_id", row.id),
+  ]);
+
+  const shipping = address as AddressRow | null;
+  return {
+    id: row.id,
+    user_id: (user?.clerk_user_id as string | undefined) ?? row.user_id,
+    org_id: (account?.clerk_org_id as string | null | undefined) ?? null,
+    status: row.status,
+    subtotal_cents: row.subtotal_cents,
+    shipping_cents: row.shipping_cents,
+    tax_cents: row.tax_cents,
+    total_cents: row.total_cents,
+    delivery_method: row.delivery_method,
+    shipping_address: shipping
+      ? {
+          id: shipping.id,
+          user_id: (user?.clerk_user_id as string | undefined) ?? row.user_id,
+          label: shipping.label,
+          line1: shipping.line1,
+          line2: shipping.line2,
+          city: shipping.city,
+          state: shipping.state,
+          zip: shipping.zip,
+          is_default: shipping.is_default,
+        }
+      : null,
+    items: ((items ?? []) as OrderItemRow[]).map((item) => {
+      const product = Array.isArray(item.products) ? item.products[0] : item.products;
+      return {
+        product_id: item.product_id,
+        sku: product?.sku ?? "",
+        name: product?.name ?? "",
+        cases: item.cases,
+        unit_price_cents_at_purchase: item.unit_price_cents_at_purchase,
+      };
+    }),
+    stripe_payment_intent_id: row.stripe_payment_intent_id,
+    created_at: row.created_at,
+  };
 }
 
 export async function placeOrder(options: {
@@ -44,114 +136,200 @@ export async function placeOrder(options: {
     throw new Error("Cart is empty");
   }
 
-  const order: OrderRecord = {
-    id: `ord_${randomUUID().slice(0, 8)}`,
-    user_id: options.userId,
-    org_id: options.orgId,
-    status: "pending",
-    subtotal_cents: cart.totals.subtotal_cents,
-    shipping_cents: cart.totals.shipping_cents,
-    tax_cents: cart.totals.tax_cents,
-    total_cents: cart.totals.total_cents,
-    delivery_method: options.deliveryMethodId,
-    shipping_address: {
-      id: randomUUID(),
-      user_id: options.userId,
-      ...options.address,
-    },
-    items: cart.items.map((item) => ({
+  const supabase = createServiceClient();
+  const user = await ensureAppUser(options.userId);
+  const business = options.orgId ? await ensureBusinessAccount(options.orgId) : null;
+  if (business && user.business_account_id !== business.id) {
+    await supabase.from("users").update({ business_account_id: business.id }).eq("id", user.id);
+  }
+
+  if (options.address.is_default) {
+    await supabase.from("addresses").update({ is_default: false }).eq("user_id", user.id);
+  }
+
+  const { data: address, error: addressError } = await supabase
+    .from("addresses")
+    .insert({
+      user_id: user.id,
+      business_account_id: business?.id ?? null,
+      label: options.address.label,
+      line1: options.address.line1,
+      line2: options.address.line2,
+      city: options.address.city,
+      state: options.address.state,
+      zip: options.address.zip,
+      is_default: options.address.is_default,
+    })
+    .select("id")
+    .single();
+  assertNoError(addressError, "Could not save shipping address");
+
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .insert({
+      user_id: user.id,
+      business_account_id: business?.id ?? null,
+      status: "pending",
+      subtotal_cents: cart.totals.subtotal_cents,
+      shipping_cents: cart.totals.shipping_cents,
+      tax_cents: cart.totals.tax_cents,
+      total_cents: cart.totals.total_cents,
+      delivery_method: options.deliveryMethodId,
+      shipping_address_id: address?.id ?? null,
+    })
+    .select("*")
+    .single();
+  assertNoError(orderError, "Could not create order");
+
+  const { error: itemsError } = await supabase.from("order_items").insert(
+    cart.items.map((item) => ({
+      order_id: order.id,
       product_id: item.product.id,
-      sku: item.product.sku,
-      name: item.product.name,
       cases: item.cases,
       unit_price_cents_at_purchase: item.unit_price_cents,
     })),
-    stripe_payment_intent_id: null,
-    created_at: new Date().toISOString(),
-  };
+  );
+  assertNoError(itemsError, "Could not create order items");
 
-  await mutateStore((store) => {
-    store.orders.unshift(order);
-    if (options.address.is_default) {
-      for (const item of store.addresses) {
-        if (item.user_id === options.userId) item.is_default = false;
-      }
-    }
-    store.addresses.push(order.shipping_address!);
-  });
-
-  return order;
+  return mapOrder(order as OrderRow);
 }
 
 export async function attachPaymentIntent(orderId: string, paymentIntentId: string) {
-  return mutateStore((store) => {
-    const order = store.orders.find((item) => item.id === orderId);
-    if (!order) throw new Error("Order not found");
-    order.stripe_payment_intent_id = paymentIntentId;
-    return order;
-  });
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ stripe_payment_intent_id: paymentIntentId })
+    .eq("id", orderId)
+    .select("*")
+    .single();
+  assertNoError(error, "Order not found");
+  return mapOrder(data as OrderRow);
 }
 
 export async function markOrderPaid(orderId: string) {
-  return mutateStore((store) => {
-    const order = store.orders.find((item) => item.id === orderId);
-    if (!order) throw new Error("Order not found");
-    if (order.status === "paid" || order.status === "fulfilled") return order;
-    assertStatusTransition(order.status, "paid");
-    order.status = "paid";
-    for (const item of order.items) {
-      const seedQty = PRODUCTS.find((product) => product.id === item.product_id)?.quantity_on_hand ?? 0;
-      const storedProduct = store.products.find((product) => product.id === item.product_id);
-      const current = store.inventory[item.product_id] ?? storedProduct?.quantity_on_hand ?? seedQty;
-      store.inventory[item.product_id] = Math.max(0, current - item.cases);
+  const supabase = createServiceClient();
+  const { data: order, error } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+  assertNoError(error, "Order not found");
+  if (!order) throw new Error("Order not found");
+  if (order.status === "paid" || order.status === "fulfilled") {
+    return mapOrder(order as OrderRow);
+  }
+  assertStatusTransition(order.status as OrderStatus, "paid");
+
+  const { data: items, error: itemsError } = await supabase
+    .from("order_items")
+    .select("product_id, cases")
+    .eq("order_id", orderId);
+  assertNoError(itemsError, "Could not load order items");
+
+  for (const item of items ?? []) {
+    const { data: inventoryRows, error: inventoryError } = await supabase
+      .from("inventory")
+      .select("id, quantity_on_hand")
+      .eq("product_id", item.product_id);
+    assertNoError(inventoryError, "Could not load inventory");
+    let remaining = item.cases as number;
+    for (const row of inventoryRows ?? []) {
+      if (remaining <= 0) break;
+      const take = Math.min(row.quantity_on_hand, remaining);
+      const { error: updateError } = await supabase
+        .from("inventory")
+        .update({ quantity_on_hand: Math.max(0, row.quantity_on_hand - take) })
+        .eq("id", row.id);
+      assertNoError(updateError, "Could not decrement inventory");
+      remaining -= take;
     }
-    store.carts[order.user_id] = [];
-    return order;
-  });
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("orders")
+    .update({ status: "paid" })
+    .eq("id", orderId)
+    .select("*")
+    .single();
+  assertNoError(updateError, "Could not mark order paid");
+
+  const { data: user } = await supabase.from("users").select("clerk_user_id").eq("id", order.user_id).maybeSingle();
+  if (user?.clerk_user_id) {
+    await clearCart(user.clerk_user_id);
+  }
+
+  return mapOrder(updated as OrderRow);
 }
 
 export async function markOrderPaymentFailed(orderId: string) {
-  return mutateStore((store) => {
-    const order = store.orders.find((item) => item.id === orderId);
-    if (!order) throw new Error("Order not found");
-    if (order.status === "payment_failed") return order;
-    if (order.status === "paid" || order.status === "fulfilled") return order;
-    assertStatusTransition(order.status, "payment_failed");
-    order.status = "payment_failed";
-    return order;
-  });
+  const supabase = createServiceClient();
+  const { data: order, error } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+  assertNoError(error, "Order not found");
+  if (!order) throw new Error("Order not found");
+  if (order.status === "payment_failed") return mapOrder(order as OrderRow);
+  if (order.status === "paid" || order.status === "fulfilled") return mapOrder(order as OrderRow);
+  assertStatusTransition(order.status as OrderStatus, "payment_failed");
+  const { data, error: updateError } = await supabase
+    .from("orders")
+    .update({ status: "payment_failed" })
+    .eq("id", orderId)
+    .select("*")
+    .single();
+  assertNoError(updateError, "Could not mark payment failed");
+  return mapOrder(data as OrderRow);
 }
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   if (status === "paid") return markOrderPaid(orderId);
   if (status === "payment_failed") return markOrderPaymentFailed(orderId);
-  return mutateStore((store) => {
-    const order = store.orders.find((item) => item.id === orderId);
-    if (!order) throw new Error("Order not found");
-    assertStatusTransition(order.status, status);
-    order.status = status;
-    return order;
-  });
+  const supabase = createServiceClient();
+  const { data: order, error } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+  assertNoError(error, "Order not found");
+  if (!order) throw new Error("Order not found");
+  assertStatusTransition(order.status as OrderStatus, status);
+  const { data, error: updateError } = await supabase.from("orders").update({ status }).eq("id", orderId).select("*").single();
+  assertNoError(updateError, "Could not update order status");
+  return mapOrder(data as OrderRow);
 }
 
 export async function listOrdersForUser(userId: string, orgId: string | null) {
-  const store = await readStoreLocked();
-  return store.orders.filter((order) => order.user_id === userId || (orgId && order.org_id === orgId));
+  const supabase = createServiceClient();
+  const user = await ensureAppUser(userId);
+  const business = orgId ? await ensureBusinessAccount(orgId) : null;
+  let query = supabase.from("orders").select("*").order("created_at", { ascending: false });
+  if (business) {
+    query = query.or(`user_id.eq.${user.id},business_account_id.eq.${business.id}`);
+  } else {
+    query = query.eq("user_id", user.id);
+  }
+  const { data, error } = await query;
+  assertNoError(error, "Could not load orders");
+  return Promise.all(((data ?? []) as OrderRow[]).map(mapOrder));
 }
 
 export async function listAllOrders(status?: OrderStatus) {
-  const store = await readStoreLocked();
-  return status ? store.orders.filter((order) => order.status === status) : store.orders;
+  const supabase = createServiceClient();
+  let query = supabase.from("orders").select("*").order("created_at", { ascending: false });
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  assertNoError(error, "Could not load orders");
+  return Promise.all(((data ?? []) as OrderRow[]).map(mapOrder));
 }
 
 export async function getOrder(orderId: string) {
-  const store = await readStoreLocked();
-  return store.orders.find((order) => order.id === orderId) ?? null;
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+  assertNoError(error, "Could not load order");
+  if (!data) return null;
+  return mapOrder(data as OrderRow);
 }
 
 export async function getOrderByPaymentIntent(paymentIntentId: string) {
-  const store = await readStoreLocked();
-  return store.orders.find((order) => order.stripe_payment_intent_id === paymentIntentId) ?? null;
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .maybeSingle();
+  assertNoError(error, "Could not load order");
+  if (!data) return null;
+  return mapOrder(data as OrderRow);
 }
 
 export async function reorderPreview(orderId: string, accountTier: AccountTier) {
@@ -162,9 +340,7 @@ export async function reorderPreview(orderId: string, accountTier: AccountTier) 
   const items = [];
   for (const item of order.items) {
     const product = await getProductById(item.product_id, accountTier, true);
-    const currentPrice = product
-      ? resolveCasePrice(product.price_tiers, item.cases, accountTier)
-      : null;
+    const currentPrice = product ? resolveCasePrice(product.price_tiers, item.cases, accountTier) : null;
     items.push({
       ...item,
       available: Boolean(product?.is_active) && product?.stock_status !== "out_of_stock",
@@ -178,19 +354,43 @@ export async function reorderPreview(orderId: string, accountTier: AccountTier) 
 }
 
 export async function saveAddress(userId: string, address: Omit<AddressRecord, "id" | "user_id">) {
-  return mutateStore((store) => {
-    const record: AddressRecord = { id: randomUUID(), user_id: userId, ...address };
-    if (record.is_default) {
-      for (const item of store.addresses) {
-        if (item.user_id === userId) item.is_default = false;
-      }
-    }
-    store.addresses.push(record);
-    return record;
-  });
+  const supabase = createServiceClient();
+  const user = await ensureAppUser(userId);
+  if (address.is_default) {
+    await supabase.from("addresses").update({ is_default: false }).eq("user_id", user.id);
+  }
+  const { data, error } = await supabase
+    .from("addresses")
+    .insert({
+      id: randomUUID(),
+      user_id: user.id,
+      label: address.label,
+      line1: address.line1,
+      line2: address.line2,
+      city: address.city,
+      state: address.state,
+      zip: address.zip,
+      is_default: address.is_default,
+    })
+    .select("id, user_id, label, line1, line2, city, state, zip, is_default")
+    .single();
+  assertNoError(error, "Could not save address");
+  return {
+    ...(data as AddressRow),
+    user_id: userId,
+  } satisfies AddressRecord;
 }
 
 export async function listAddresses(userId: string) {
-  const store = await readStoreLocked();
-  return store.addresses.filter((item) => item.user_id === userId);
+  const supabase = createServiceClient();
+  const user = await ensureAppUser(userId);
+  const { data, error } = await supabase
+    .from("addresses")
+    .select("id, user_id, label, line1, line2, city, state, zip, is_default")
+    .eq("user_id", user.id);
+  assertNoError(error, "Could not load addresses");
+  return ((data ?? []) as AddressRow[]).map((item) => ({
+    ...item,
+    user_id: userId,
+  })) satisfies AddressRecord[];
 }

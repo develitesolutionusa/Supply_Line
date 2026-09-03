@@ -50,7 +50,7 @@ export default async function HomePage() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-navy">Shop by category</h2>
-            <p className="mt-1 text-sm text-slate-600">Pulled from the catalog categories API.</p>
+            <p className="mt-1 text-sm text-slate-600">Trays, containers, cups, cutlery, and more for restaurant kitchens.</p>
           </div>
           <Link href="/catalog" className="hidden text-sm font-semibold text-sky-dark hover:underline sm:inline">
             View all

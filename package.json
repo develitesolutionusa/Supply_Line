@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start",
     "test": "tsx --test tests/pricing.test.ts",
-    "db:seed-sql": "tsx supabase/scripts/emit-seed.ts"
+    "db:seed-sql": "tsx supabase/scripts/emit-seed.ts",
+    "db:push": "node supabase/scripts/push-remote.mjs",
+    "db:status": "node supabase/scripts/check-remote.mjs",
+    "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.8.4",

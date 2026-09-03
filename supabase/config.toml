@@ -1,5 +1,5 @@
--- Project id is filled in by `supabase link`. Keep this file so the CLI has a config root.
-project_id = "supply-line"
+# Linked to the real Supabase project.
+project_id = "bxicpjibrutckiavoivr"
 
 [api]
 enabled = true

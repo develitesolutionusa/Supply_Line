@@ -1,6 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import type { AccountTier } from "@/types/commerce";
-import { readStoreLocked } from "@/lib/store/file-store";
+import { getBusinessAccountByClerkOrg } from "@/lib/supabase/identity";
 
 export type AccountContext = {
   userId: string | null;
@@ -29,8 +29,8 @@ export async function getAccountContext(): Promise<AccountContext> {
 
   let taxExempt = false;
   if (orgId) {
-    const store = await readStoreLocked();
-    taxExempt = store.businessAccounts[orgId]?.tax_exempt ?? false;
+    const account = await getBusinessAccountByClerkOrg(orgId);
+    taxExempt = account?.tax_exempt ?? false;
   }
 
   return {
