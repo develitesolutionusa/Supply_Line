@@ -68,7 +68,7 @@ export function AdminOrderTable() {
         ))}
       </select>
       {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
-      <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="surface-card surface-card-static mt-4 overflow-x-auto">
         <table className="w-full min-w-[40rem] text-left text-sm">
           <thead className="bg-canvas text-xs uppercase tracking-wide text-slate-500">
             <tr>
