@@ -15,7 +15,7 @@ const STYLES: Record<StockStatus, string> = {
 export function StockBadge({ status }: { status: StockStatus }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${STYLES[status]}`}
+      className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${STYLES[status]}`}
       aria-label={`Stock status: ${LABELS[status]}`}
     >
       {LABELS[status]}

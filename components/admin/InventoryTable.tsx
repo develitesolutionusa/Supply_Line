@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { StockBadge } from "@/components/catalog/StockBadge";
+import { PanelSkeleton } from "@/components/ui/PageSkeleton";
 import type { ResolvedProduct } from "@/lib/catalog/query";
 
 export function InventoryTable() {
-  const [products, setProducts] = useState<ResolvedProduct[]>([]);
+  const [products, setProducts] = useState<ResolvedProduct[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -13,6 +14,7 @@ export function InventoryTable() {
     const data = await response.json();
     if (!response.ok) {
       setError(data.error ?? "Could not load inventory");
+      setProducts([]);
       return;
     }
     setProducts(data.products);
@@ -40,12 +42,17 @@ export function InventoryTable() {
   return (
     <div>
       {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+      {!products ? (
+        <PanelSkeleton label="Loading inventory" />
+      ) : (
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[36rem] text-left text-sm">
+        <table className="w-full min-w-[40rem] text-left text-sm">
           <thead className="bg-canvas text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-3">Product</th>
+              <th className="px-4 py-3">SKU</th>
               <th className="px-4 py-3">On hand</th>
+              <th className="px-4 py-3">Reorder level</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Save</th>
             </tr>
@@ -57,6 +64,7 @@ export function InventoryTable() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
@@ -72,10 +80,8 @@ function InventoryRow({
   useEffect(() => setQty(product.quantity_on_hand), [product.quantity_on_hand]);
   return (
     <tr className="border-t border-slate-100">
-      <td className="px-4 py-3">
-        {product.name}
-        <span className="ml-2 font-mono text-xs text-slate-500">{product.sku}</span>
-      </td>
+      <td className="px-4 py-3">{product.name}</td>
+      <td className="px-4 py-3 font-mono text-xs">{product.sku}</td>
       <td className="px-4 py-3">
         <label className="sr-only" htmlFor={`inv-${product.id}`}>
           On-hand quantity for {product.name}
@@ -86,16 +92,17 @@ function InventoryRow({
           min={0}
           value={qty}
           onChange={(event) => setQty(Number(event.target.value))}
-          className="h-10 w-24 rounded-lg border border-slate-200 px-2"
+          className="h-10 w-24 rounded-md border border-slate-200 px-2"
         />
       </td>
+      <td className="px-4 py-3 text-sm text-slate-600">{product.low_stock_threshold}</td>
       <td className="px-4 py-3">
         <StockBadge status={product.stock_status} />
       </td>
       <td className="px-4 py-3">
         <button
           type="button"
-          className="text-sm font-semibold text-sky-dark hover:underline"
+          className="text-sm font-semibold text-sky-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
           onClick={() => void onSave(product.id, qty)}
         >
           Save

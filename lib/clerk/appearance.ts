@@ -1,9 +1,9 @@
 export const clerkAppearance = {
   variables: {
-    colorPrimary: "#0F172A",
+    colorPrimary: "#2563EB",
     colorForeground: "#0F172A",
     colorBackground: "#FFFFFF",
-    colorMutedForeground: "#64748B",
+    colorMutedForeground: "#475569",
     colorInput: "#FFFFFF",
     colorInputForeground: "#0F172A",
     borderRadius: "0.5rem",
@@ -15,13 +15,13 @@ export const clerkAppearance = {
       border: "1px solid #E2E8F0",
     },
     formButtonPrimary: {
-      backgroundColor: "#0F172A",
+      backgroundColor: "#2563EB",
       "&:hover": {
-        backgroundColor: "#1E293B",
+        backgroundColor: "#1D4ED8",
       },
     },
     footerActionLink: {
-      color: "#0284C7",
+      color: "#1D4ED8",
     },
   },
 };

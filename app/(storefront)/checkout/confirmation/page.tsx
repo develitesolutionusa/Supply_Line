@@ -5,6 +5,7 @@ import { getAccountContext } from "@/lib/auth/context";
 import { requireUser } from "@/lib/auth/requireUser";
 import { getOrder } from "@/lib/orders/service";
 import { formatCents } from "@/lib/pricing";
+import { fieldClass } from "@/lib/ui";
 
 export const metadata = {
   title: "Order confirmation",
@@ -26,7 +27,7 @@ export default async function ConfirmationPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-dark">Confirmation</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-text">Confirmation</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy">
         {order.status === "paid" || order.status === "fulfilled" ? "Order placed" : "Order received"}
       </h1>
@@ -55,11 +56,11 @@ export default async function ConfirmationPage({
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
           href={`/account/orders/${order.id}`}
-          className="inline-flex h-11 items-center rounded-lg bg-navy px-5 text-sm font-semibold text-white"
+          className={fieldClass.BUTTON}
         >
           View order
         </Link>
-        <Link href="/catalog" className="inline-flex h-11 items-center rounded-lg border border-slate-200 px-5 text-sm font-semibold text-navy">
+        <Link href="/catalog" className={fieldClass.GHOST}>
           Continue shopping
         </Link>
       </div>

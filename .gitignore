@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+.lighthouse/
 
 # next.js
 /.next/
@@ -50,4 +51,7 @@ next-env.d.ts
 .data/
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# editor
+.cursor/
 

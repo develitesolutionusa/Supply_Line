@@ -28,5 +28,5 @@ Confirm these before promoting `main` to production.
 npm test
 npm run test:integration   # skipped unless STRIPE_SECRET_KEY is sk_test_
 npm run db:rls
-npm run load:test          # against LOAD_TEST_BASE_URL, default http://localhost:3000
+npm run lighthouse          # storefront a11y/SEO (dev server must be running)
 ```

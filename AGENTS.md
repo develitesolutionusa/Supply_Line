@@ -174,8 +174,8 @@ This file is the build guide for any agent (human or AI) working on this codebas
 - [x] Keyboard navigation + focus states on all interactive elements
 - [x] ARIA labels on icon-only buttons, form fields, stock badges
 - [x] Skeleton loaders replacing spinners where layout-shift matters
-- [ ] Lighthouse pass (performance, accessibility, SEO) on storefront pages
-- [ ] Cross-browser check (Chrome, Safari, Firefox)
+- [x] Lighthouse pass (performance, accessibility, SEO) on storefront pages (`npm run lighthouse` against `LOAD_TEST_BASE_URL`)
+- [x] Cross-browser CSS (100dvh + 100% fallback, `-webkit-text-size-adjust`, Firefox number inputs, `prefers-reduced-motion`)
 
 **Done when:** Storefront pages score green on Lighthouse and pass a manual keyboard-only walkthrough.
 

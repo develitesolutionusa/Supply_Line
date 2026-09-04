@@ -9,5 +9,10 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     listCategories(),
   ]);
   if (!product) notFound();
-  return <ProductEditor product={product} categories={categories} />;
+  return (
+    <div>
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight text-navy">Edit product</h1>
+      <ProductEditor product={product} categories={categories} />
+    </div>
+  );
 }

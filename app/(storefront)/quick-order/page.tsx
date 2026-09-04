@@ -2,14 +2,15 @@ import { QuickOrderForm } from "@/components/quick-order/QuickOrderForm";
 
 export const metadata = {
   title: "Quick order",
+  description: "Add multiple SKUs and case quantities to your cart in one sheet.",
 };
 
 export default function QuickOrderPage() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy">Quick order</h1>
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <h1 className="text-2xl font-semibold tracking-tight text-navy sm:text-3xl">Quick order</h1>
       <p className="mt-2 text-sm text-slate-600">
-        Enter SKUs and case quantities. Unknown or out-of-stock rows are skipped with a reason.
+        Built for restaurant purchasers — enter SKUs and case quantities, then add everything in one pass.
       </p>
       <div className="mt-8">
         <QuickOrderForm />

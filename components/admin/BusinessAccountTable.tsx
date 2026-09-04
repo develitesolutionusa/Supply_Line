@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PanelSkeleton } from "@/components/ui/PageSkeleton";
 
 type Account = {
   id: string;
@@ -9,7 +10,7 @@ type Account = {
 };
 
 export function BusinessAccountTable() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -17,6 +18,7 @@ export function BusinessAccountTable() {
     const data = await response.json();
     if (!response.ok) {
       setError(data.error ?? "Could not load accounts");
+      setAccounts([]);
       return;
     }
     setAccounts(data.accounts);
@@ -43,7 +45,9 @@ export function BusinessAccountTable() {
   return (
     <div>
       {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
-      {accounts.length === 0 ? (
+      {!accounts ? (
+        <PanelSkeleton label="Loading business accounts" />
+      ) : accounts.length === 0 ? (
         <p className="text-sm text-slate-600">No business accounts yet. They appear after org signup or checkout.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">

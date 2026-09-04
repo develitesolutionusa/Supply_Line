@@ -53,7 +53,7 @@ export function AddressBook({ initial }: { initial: AddressRecord[] }) {
                 <br />
                 {address.city}, {address.state} {address.zip}
               </p>
-              {address.is_default ? <p className="mt-2 text-xs font-semibold text-sky-dark">Default</p> : null}
+              {address.is_default ? <p className="mt-2 text-xs font-semibold text-sky-text">Default</p> : null}
             </li>
           ))}
         </ul>
@@ -130,7 +130,7 @@ export function AddressBook({ initial }: { initial: AddressRecord[] }) {
           <button
             type="submit"
             disabled={pending}
-            className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300"
+            className={fieldClass.BUTTON}
           >
             {pending ? "Saving…" : "Save address"}
           </button>

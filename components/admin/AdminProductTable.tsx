@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ProductMedia } from "@/components/catalog/ProductMedia";
 import { StockBadge } from "@/components/catalog/StockBadge";
-import { formatCents } from "@/lib/pricing";
+import { formatCents, startingCasePrice } from "@/lib/pricing";
+import { fieldClass } from "@/lib/ui";
 import type { ResolvedProduct } from "@/lib/catalog/query";
 
 export function AdminProductTable() {
@@ -39,39 +41,58 @@ export function AdminProductTable() {
         />
         <Link
           href="/admin/products/new"
-          className="inline-flex h-11 items-center rounded-lg bg-navy px-4 text-sm font-semibold text-white"
+          className={fieldClass.BUTTON}
         >
           New product
         </Link>
       </div>
       {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
-      <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[40rem] text-left text-sm">
+      <div className="mt-4 overflow-x-auto rounded-md border border-slate-200 bg-white">
+        <table className="w-full min-w-[52rem] text-left text-sm">
           <thead className="bg-canvas text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-3">Product</th>
               <th className="px-4 py-3">SKU</th>
-              <th className="px-4 py-3">Starting</th>
+              <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3">Pack</th>
               <th className="px-4 py-3">Stock</th>
-              <th className="px-4 py-3">Active</th>
+              <th className="px-4 py-3">Retail</th>
+              <th className="px-4 py-3">Wholesale</th>
+              <th className="px-4 py-3">Status</th>
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {products.map((product) => {
+              const retail = startingCasePrice(product.price_tiers, "individual");
+              const wholesale =
+                product.price_tiers[product.price_tiers.length - 1]?.price_per_case_cents ?? retail;
+              return (
               <tr key={product.id} className="border-t border-slate-100">
                 <td className="px-4 py-3">
-                  <Link href={`/admin/products/${product.id}`} className="font-medium text-navy hover:underline">
+                  <Link href={`/admin/products/${product.id}`} className="flex items-center gap-3 font-medium text-navy hover:underline">
+                    <span className="w-12 shrink-0">
+                      <ProductMedia
+                        name={product.name}
+                        sku={product.sku}
+                        imageUrl={product.image_url}
+                        categorySlug={product.category.slug}
+                      />
+                    </span>
                     {product.name}
                   </Link>
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">{product.sku}</td>
-                <td className="px-4 py-3">{formatCents(product.starting_price_cents)}</td>
+                <td className="px-4 py-3">{product.category.name}</td>
+                <td className="px-4 py-3">{product.pack_size}</td>
                 <td className="px-4 py-3">
                   <StockBadge status={product.stock_status} />
                 </td>
-                <td className="px-4 py-3">{product.is_active ? "Yes" : "No"}</td>
+                <td className="px-4 py-3">{formatCents(retail)}</td>
+                <td className="px-4 py-3">{formatCents(wholesale)}</td>
+                <td className="px-4 py-3">{product.is_active ? "Active" : "Hidden"}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

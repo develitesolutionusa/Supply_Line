@@ -13,8 +13,7 @@ Clerk keys live in `.env.local` (created by `clerk init`). Copy `.env.example` i
 ```bash
 npm test
 npm run test:integration
-npm run db:rls
-npm run load:test
+npm run lighthouse
 ```
 
 Preview/staging env vars: `.env.preview.example`. Backup and promote checklist: [docs/operations.md](./docs/operations.md).

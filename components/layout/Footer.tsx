@@ -8,8 +8,7 @@ export function Footer() {
         <div>
           <p className="text-lg font-semibold text-navy">{SITE_NAME}</p>
           <p className="mt-2 max-w-xs text-sm leading-6 text-muted">
-            Case-priced wholesale for restaurants, offices, and retail operators.
-            Prices, tax, and stock always come from the server.
+            Case-priced foodservice disposables for restaurants, caterers, and purchasing managers.
           </p>
         </div>
         <div>
@@ -19,7 +18,7 @@ export function Footer() {
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="text-sm text-navy hover:text-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+                  className="text-sm text-navy hover:text-sky-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
                 >
                   {link.label}
                 </Link>
@@ -34,7 +33,7 @@ export function Footer() {
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="text-sm text-navy hover:text-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+                  className="text-sm text-navy hover:text-sky-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
                 >
                   {link.label}
                 </Link>

@@ -14,7 +14,7 @@ export default async function CreateOrganizationPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-12 sm:px-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-dark">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-text">
         Business account
       </p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy">Create your company</h1>

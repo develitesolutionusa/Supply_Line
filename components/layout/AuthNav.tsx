@@ -11,7 +11,7 @@ export function AuthNav() {
     return (
       <Link
         href="/sign-in"
-        className="inline-flex h-10 items-center rounded-lg bg-sky px-3 text-sm font-semibold text-navy transition hover:bg-sky-dark hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white transition hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >
         Sign in
       </Link>
@@ -39,7 +39,7 @@ function ClerkAuthNav() {
         </Link>
         <Link
           href="/sign-in"
-          className="inline-flex h-10 items-center rounded-lg bg-sky px-3 text-sm font-semibold text-navy transition hover:bg-sky-dark hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white transition hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           Sign in
         </Link>
@@ -96,9 +96,10 @@ function SignedInAccountMenu() {
         aria-expanded={open}
         aria-controls={menuId}
         aria-haspopup="menu"
+        aria-label={`Account menu for ${displayName}`}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky text-xs font-semibold text-navy">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky text-xs font-semibold text-white">
           {displayName.slice(0, 1).toUpperCase()}
         </span>
         <span className="hidden min-w-0 sm:block">
@@ -142,7 +143,7 @@ function SignedInAccountMenu() {
           <Link
             href="/account/orders"
             role="menuitem"
-            className="block px-3 py-2 text-sm hover:bg-slate-50"
+            className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
             onClick={() => setOpen(false)}
           >
             My orders
@@ -150,7 +151,7 @@ function SignedInAccountMenu() {
           <Link
             href="/account"
             role="menuitem"
-            className="block px-3 py-2 text-sm hover:bg-slate-50"
+            className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
             onClick={() => setOpen(false)}
           >
             Account
@@ -159,7 +160,7 @@ function SignedInAccountMenu() {
             <Link
               href="/admin"
               role="menuitem"
-              className="block px-3 py-2 text-sm hover:bg-slate-50"
+              className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
               onClick={() => setOpen(false)}
             >
               Admin
@@ -169,7 +170,7 @@ function SignedInAccountMenu() {
             <Link
               href="/create-organization"
               role="menuitem"
-              className="block px-3 py-2 text-sm hover:bg-slate-50"
+              className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
               onClick={() => setOpen(false)}
             >
               Create company
@@ -179,7 +180,7 @@ function SignedInAccountMenu() {
             <button
               type="button"
               role="menuitem"
-              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
             >
               Sign out
             </button>

@@ -6,7 +6,7 @@ type RouteErrorProps = {
 export function RouteError({ title = "Something went wrong", reset }: RouteErrorProps) {
   return (
     <div className="mx-auto max-w-lg px-4 py-16 text-center sm:px-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-dark">Error</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-text">Error</p>
       <h1 className="mt-2 text-3xl font-semibold text-navy">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         This route hit an error boundary. You can retry, or head back to the catalog.

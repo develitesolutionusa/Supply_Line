@@ -112,6 +112,8 @@ export async function listProducts(options: {
   limit?: number;
   accountTier: AccountTier;
   includeInactive?: boolean;
+  inStock?: boolean;
+  sort?: "name" | "price";
 }) {
   const requestedPage = Math.max(1, options.page ?? 1);
   const requestedLimit = Math.min(48, Math.max(1, options.limit ?? 12));
@@ -141,20 +143,34 @@ export async function listProducts(options: {
     query = query.or(searchFilter);
   }
 
-  const start = (requestedPage - 1) * requestedLimit;
-  const { data, error, count } = await query.order("name").range(start, start + requestedLimit - 1);
-  assertNoError(error, "Could not load products");
-  const total = count ?? (data ?? []).length;
-  const { page, limit, total_pages } = pageBounds(requestedPage, requestedLimit, total);
+  const paginateInMemory = Boolean(options.inStock || options.sort === "price");
+  if (paginateInMemory) {
+    query = query.order("name").limit(48);
+  } else {
+    const start = (requestedPage - 1) * requestedLimit;
+    query = query.order("name").range(start, start + requestedLimit - 1);
+  }
 
+  const { data, error, count } = await query;
+  assertNoError(error, "Could not load products");
   const products = ((data ?? []) as ProductRow[]).map(mapProduct);
   const inventory = Object.fromEntries(products.map((product) => [product.id, product.quantity_on_hand]));
-  const resolved = await Promise.all(
+  let resolved = await Promise.all(
     products.map((product) => hydrateProduct(product, options.accountTier, inventory, categories)),
   );
+  if (options.inStock) {
+    resolved = resolved.filter((product) => product.stock_status !== "out_of_stock");
+  }
+  if (options.sort === "price") {
+    resolved = [...resolved].sort((left, right) => left.starting_price_cents - right.starting_price_cents);
+  }
+  const total = paginateInMemory ? resolved.length : (count ?? resolved.length);
+  const { page, limit, total_pages } = pageBounds(requestedPage, requestedLimit, total);
+  const start = (page - 1) * limit;
+  const paged = paginateInMemory ? resolved.slice(start, start + limit) : resolved;
 
   return {
-    products: resolved,
+    products: paged,
     page,
     limit,
     total,

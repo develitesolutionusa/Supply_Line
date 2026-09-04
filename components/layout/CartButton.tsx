@@ -48,7 +48,7 @@ export function CartButton() {
         <circle cx="18" cy="20" r="1.3" fill="currentColor" stroke="none" />
       </svg>
       {count > 0 ? (
-        <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-sky px-1 text-[10px] font-bold text-navy">
+        <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-sky px-1 text-[10px] font-bold text-white">
           {count}
         </span>
       ) : null}

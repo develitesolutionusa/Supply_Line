@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OrderStatusBadge, formatDate } from "@/components/ui/StatusBadge";
 import { getAccountContext } from "@/lib/auth/context";
 import { requireUser } from "@/lib/auth/requireUser";
+import { shortOrderId } from "@/lib/catalog/display";
 import { listOrdersForUser } from "@/lib/orders/service";
 import { formatCents } from "@/lib/pricing";
 
@@ -39,7 +40,7 @@ export default async function AccountOrdersPage({
                   className="flex flex-col gap-2 px-5 py-4 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <span>
-                    <span className="font-mono text-sm font-semibold text-navy">{order.id}</span>
+                    <span className="font-mono text-sm font-semibold text-navy">{shortOrderId(order.id)}</span>
                     <span className="mt-1 block text-xs text-slate-500">{formatDate(order.created_at)}</span>
                   </span>
                   <span className="flex items-center gap-3">

@@ -5,6 +5,8 @@ import { getAccountContext } from "@/lib/auth/context";
 import { requireUser } from "@/lib/auth/requireUser";
 import { getOrder } from "@/lib/orders/service";
 import { DELIVERY_METHODS, formatCents } from "@/lib/pricing";
+import { fieldClass } from "@/lib/ui";
+import { shortOrderId } from "@/lib/catalog/display";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,11 +26,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-      <Link href="/account/orders" className="text-sm font-semibold text-sky-dark hover:underline">
+      <Link href="/account/orders" className="text-sm font-semibold text-sky-text hover:underline">
         Back to orders
       </Link>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <h1 className="font-mono text-2xl font-semibold text-navy">{order.id}</h1>
+        <h1 className="font-mono text-2xl font-semibold text-navy">{shortOrderId(order.id)}</h1>
         <OrderStatusBadge status={order.status} />
       </div>
       <p className="mt-2 text-sm text-slate-600">{formatDate(order.created_at)}</p>
@@ -68,7 +70,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       </dl>
       <Link
         href="/reorder"
-        className="mt-8 inline-flex h-11 items-center rounded-lg bg-navy px-5 text-sm font-semibold text-white"
+        className={`${fieldClass.BUTTON} mt-8`}
       >
         Reorder
       </Link>

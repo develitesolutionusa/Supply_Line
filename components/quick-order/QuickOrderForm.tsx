@@ -57,7 +57,7 @@ export function QuickOrderForm() {
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
         <table className="w-full min-w-[32rem] text-left text-sm">
           <thead className="bg-canvas text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -135,15 +135,15 @@ export function QuickOrderForm() {
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
-          className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-navy hover:bg-slate-50"
+          className={fieldClass.GHOST}
           onClick={addRow}
         >
-          Add row
+          Add another product
         </button>
         <button
           type="button"
           disabled={pending}
-          className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300"
+          className={fieldClass.BUTTON}
           onClick={() => void submit()}
         >
           {pending ? "Adding…" : "Add all to cart"}

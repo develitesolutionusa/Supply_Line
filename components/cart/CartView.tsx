@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ProductMedia } from "@/components/catalog/ProductMedia";
+import { PanelSkeleton } from "@/components/ui/PageSkeleton";
 import { deleteCartItem, fetchCart, patchCartItem, type CartResponse } from "@/lib/cart/client";
 import { formatCents } from "@/lib/pricing";
+import { fieldClass } from "@/lib/ui";
 
 export function CartView() {
   const [cart, setCart] = useState<CartResponse | null>(null);
@@ -75,7 +77,7 @@ export function CartView() {
   }
 
   if (!cart) {
-    return <p className="text-sm text-slate-600">Loading cart…</p>;
+    return <PanelSkeleton label="Loading cart" />;
   }
 
   if (cart.items.length === 0) {
@@ -92,20 +94,24 @@ export function CartView() {
   const { totals } = cart;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+    <div className="grid gap-8 pb-24 lg:grid-cols-[1fr_20rem] lg:pb-0">
       <ul className="space-y-4">
         {cart.items.map((item) => (
-          <li key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <li key={item.id} className="rounded-md border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex gap-3">
                 <div className="w-20 shrink-0">
                   <ProductMedia name={item.product.name} sku={item.product.sku} imageUrl={item.product.image_url} />
                 </div>
                 <div>
-                <Link href={`/products/${item.product.sku}`} className="font-semibold text-navy hover:underline">
+                <Link
+                  href={`/products/${item.product.sku}`}
+                  className={`font-semibold text-navy hover:underline ${fieldClass.RING}`}
+                >
                   {item.product.name}
                 </Link>
-                <p className="font-mono text-xs text-slate-500">{item.product.sku}</p>
+                <p className="font-mono text-xs text-slate-500">SKU: {item.product.sku}</p>
+                <p className="mt-1 text-xs text-slate-500">{item.product.pack_size}</p>
                 <p className="mt-1 text-sm text-slate-600">
                   {formatCents(item.unit_price_cents)} / case
                 </p>
@@ -123,7 +129,8 @@ export function CartView() {
                 </p>
                 <button
                   type="button"
-                  className="text-sm text-rose-700 hover:underline"
+                  className={`text-sm text-rose-700 hover:underline ${fieldClass.RING}`}
+                  aria-label={`Remove ${item.product.name} from cart`}
                   onClick={() => void deleteCartItem(item.id).then(setCart)}
                 >
                   Remove
@@ -133,7 +140,7 @@ export function CartView() {
           </li>
         ))}
       </ul>
-      <aside className="h-fit rounded-xl border border-slate-200 bg-white p-5">
+      <aside className="h-fit rounded-md border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
         <h2 className="text-lg font-semibold text-navy">Order summary</h2>
         {totals.remaining_for_free_shipping_cents > 0 ? (
           <p className="mt-3 rounded-lg bg-sky/10 px-3 py-2 text-xs text-navy">
@@ -165,11 +172,19 @@ export function CartView() {
         {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
         <Link
           href="/checkout"
-          className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-lg bg-navy text-sm font-semibold text-white hover:bg-navy-muted"
+          className={`${fieldClass.BUTTON} mt-6 w-full`}
         >
           Checkout
         </Link>
+        <Link href="/catalog" className={`${fieldClass.GHOST} mt-3 w-full`}>
+          Continue shopping
+        </Link>
       </aside>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white p-3 lg:hidden">
+        <Link href="/checkout" className={`${fieldClass.BUTTON} w-full`}>
+          Checkout · {formatCents(totals.total_cents)}
+        </Link>
+      </div>
     </div>
   );
 }
@@ -227,7 +242,7 @@ function EmptyState({
       <p className="mt-2 text-sm text-slate-600">{body}</p>
       <Link
         href={href}
-        className="mt-6 inline-flex h-11 items-center rounded-lg bg-navy px-5 text-sm font-semibold text-white"
+        className={fieldClass.BUTTON}
       >
         {cta}
       </Link>

@@ -6,12 +6,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { StepIndicator } from "@/components/ui/StepIndicator";
+import { PanelSkeleton } from "@/components/ui/PageSkeleton";
 import { emitCartUpdated } from "@/lib/cart/client";
 import { DELIVERY_METHODS, formatCents } from "@/lib/pricing";
 import { fieldClass } from "@/lib/ui";
 import type { AddressRecord, CartTotals, DeliveryMethod, OrderRecord } from "@/types/commerce";
 
-const STEPS = ["Customer", "Shipping", "Delivery", "Payment", "Review"];
+const STEPS = ["Shipping", "Payment", "Review"];
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
@@ -135,7 +136,7 @@ export function CheckoutWizard() {
       setOrder(payload.order);
       setClientSecret(payload.client_secret);
       setPaymentMode(payload.payment_mode);
-      setStep(3);
+      setStep(1);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Could not start payment");
     } finally {
@@ -166,28 +167,27 @@ export function CheckoutWizard() {
 
   async function goNext() {
     setError(null);
-    if (step === 0 && (!name.trim() || !email.trim())) {
-      setError("Name and email are required.");
-      return;
-    }
-    if (step === 1 && (!address.line1 || !address.city || !address.state || !address.zip)) {
-      setError("A complete shipping address is required.");
-      return;
-    }
-    if (step === 2) {
+    if (step === 0) {
+      if (!name.trim() || !email.trim()) {
+        setError("Name and email are required.");
+        return;
+      }
+      if (!address.line1 || !address.city || !address.state || !address.zip) {
+        setError("A complete shipping address is required.");
+        return;
+      }
       await createIntent();
+      return;
+    }
+    if (step === 1) {
+      setStep(2);
       return;
     }
     setStep((value) => Math.min(STEPS.length - 1, value + 1));
   }
 
   if (!data && !error) {
-    return (
-      <div className="space-y-4" aria-hidden>
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200" />
-        <div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-white" />
-      </div>
-    );
+    return <PanelSkeleton label="Loading checkout" />;
   }
 
   if (!data) {
@@ -201,7 +201,7 @@ export function CheckoutWizard() {
         <p className="mt-2 text-sm text-slate-600">Add cases before checking out.</p>
         <Link
           href="/catalog"
-          className="mt-6 inline-flex h-11 items-center rounded-lg bg-navy px-5 text-sm font-semibold text-white"
+          className={`${fieldClass.BUTTON} mt-6`}
         >
           Browse catalog
         </Link>
@@ -224,101 +224,99 @@ export function CheckoutWizard() {
       <StepIndicator steps={STEPS} current={step} />
 
       {step === 0 ? (
-        <div className="mt-8 space-y-4">
-          <div>
-            <label className={fieldClass.LABEL} htmlFor="checkout-name">
-              Name
-            </label>
-            <input
-              id="checkout-name"
-              className={fieldClass.INPUT}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              autoComplete="name"
-            />
-          </div>
-          <div>
-            <label className={fieldClass.LABEL} htmlFor="checkout-email">
-              Email
-            </label>
-            <input
-              id="checkout-email"
-              type="email"
-              className={fieldClass.INPUT}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-            />
-          </div>
-          {data.tax_exempt ? (
-            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              This business account is tax-exempt.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
-      {step === 1 ? (
-        <div className="mt-8 space-y-4">
-          {data.addresses.length > 0 ? (
-            <fieldset>
-              <legend className="text-sm font-medium text-navy">Saved addresses</legend>
-              <div className="mt-2 space-y-2">
-                {data.addresses.map((item) => (
-                  <label
-                    key={item.id}
-                    className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-3 text-sm"
-                  >
-                    <input
-                      type="radio"
-                      name="saved-address"
-                      onChange={() =>
-                        setAddress({
-                          label: item.label,
-                          line1: item.line1,
-                          line2: item.line2,
-                          city: item.city,
-                          state: item.state,
-                          zip: item.zip,
-                        })
-                      }
-                    />
-                    <span>
-                      <span className="font-medium text-navy">{item.label}</span>
-                      <span className="mt-1 block text-slate-600">
-                        {item.line1}, {item.city}, {item.state} {item.zip}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ) : null}
-          <AddressFields address={address} onChange={setAddress} />
-        </div>
-      ) : null}
-
-      {step === 2 ? (
-        <fieldset className="mt-8 space-y-3">
-          <legend className="text-sm font-medium text-navy">Delivery method</legend>
-          {(data.delivery_methods.length ? data.delivery_methods : DELIVERY_METHODS).map((method) => (
-            <label key={method.id} className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4">
+        <div className="mt-8 space-y-8">
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold text-navy">Contact</h2>
+            <div>
+              <label className={fieldClass.LABEL} htmlFor="checkout-name">
+                Contact name
+              </label>
               <input
-                type="radio"
-                name="delivery"
-                checked={delivery === method.id}
-                onChange={() => setDelivery(method.id)}
+                id="checkout-name"
+                className={fieldClass.INPUT}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoComplete="name"
               />
-              <span>
-                <span className="block font-medium text-navy">{method.label}</span>
-                <span className="mt-1 block text-sm text-slate-600">{method.description}</span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
+            </div>
+            <div>
+              <label className={fieldClass.LABEL} htmlFor="checkout-email">
+                Email
+              </label>
+              <input
+                id="checkout-email"
+                type="email"
+                className={fieldClass.INPUT}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            {data.tax_exempt ? (
+              <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                This business account is tax-exempt.
+              </p>
+            ) : null}
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold text-navy">Shipping address</h2>
+            {data.addresses.length > 0 ? (
+              <fieldset>
+                <legend className="text-sm font-medium text-navy">Saved addresses</legend>
+                <div className="mt-2 space-y-2">
+                  {data.addresses.map((item) => (
+                    <label
+                      key={item.id}
+                      className="flex cursor-pointer gap-3 rounded-md border border-slate-200 p-3 text-sm"
+                    >
+                      <input
+                        type="radio"
+                        name="saved-address"
+                        onChange={() =>
+                          setAddress({
+                            label: item.label,
+                            line1: item.line1,
+                            line2: item.line2,
+                            city: item.city,
+                            state: item.state,
+                            zip: item.zip,
+                          })
+                        }
+                      />
+                      <span>
+                        <span className="font-medium text-navy">{item.label}</span>
+                        <span className="mt-1 block text-slate-600">
+                          {item.line1}, {item.city}, {item.state} {item.zip}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
+            <AddressFields address={address} onChange={setAddress} />
+          </div>
+          <fieldset className="space-y-3">
+            <legend className="text-base font-semibold text-navy">Delivery method</legend>
+            {(data.delivery_methods.length ? data.delivery_methods : DELIVERY_METHODS).map((method) => (
+              <label key={method.id} className="flex cursor-pointer gap-3 rounded-md border border-slate-200 p-4">
+                <input
+                  type="radio"
+                  name="delivery"
+                  checked={delivery === method.id}
+                  onChange={() => setDelivery(method.id)}
+                />
+                <span>
+                  <span className="block font-medium text-navy">{method.label}</span>
+                  <span className="mt-1 block text-sm text-slate-600">{method.description}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        </div>
       ) : null}
 
-      {step === 3 && paymentMode === "stripe" && clientSecret && order ? (
+      {step === 1 && paymentMode === "stripe" && clientSecret && order ? (
         <div className="mt-8 space-y-6">
           <CheckoutReview
             name={name}
@@ -331,23 +329,22 @@ export function CheckoutWizard() {
             clientSecret={clientSecret}
             orderId={order.id}
             onError={setError}
-            onBack={() => setStep(2)}
+            onBack={() => setStep(0)}
           />
         </div>
       ) : null}
 
-      {step === 3 && paymentMode !== "stripe" ? (
-        <div className="mt-8 rounded-lg border border-slate-200 bg-canvas p-4 text-sm text-slate-700">
-          <p className="font-medium text-navy">Stripe Payment Element</p>
+      {step === 1 && paymentMode !== "stripe" ? (
+        <div className="mt-8 rounded-md border border-slate-200 bg-canvas p-4 text-sm text-slate-700">
+          <p className="font-medium text-navy">Payment</p>
           <p className="mt-2">
-            Stripe keys are not configured, so a card form is not shown. Place order will record a
-            paid demo order so catalog, cart, reorder, and admin can be tested. Add Stripe test keys
-            to embed the real Payment Element.
+            Stripe keys are not configured, so a card form is not shown. Continue to review and place a
+            demo order, or add Stripe test keys to embed the Payment Element.
           </p>
         </div>
       ) : null}
 
-      {step === 4 ? (
+      {step === 2 ? (
         <div className="mt-8">
           <CheckoutReview
             name={name}
@@ -359,33 +356,37 @@ export function CheckoutWizard() {
         </div>
       ) : null}
 
-      {error ? <p className="mt-4 text-sm text-rose-700">{error}</p> : null}
+      {error ? (
+        <p className="mt-4 text-sm text-rose-700" role="alert">
+          {error}
+        </p>
+      ) : null}
 
-      {step === 3 && paymentMode === "stripe" ? null : (
+      {step === 1 && paymentMode === "stripe" ? null : (
         <div className="mt-8 flex flex-wrap gap-3">
           {step > 0 ? (
             <button
               type="button"
-              className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+              className={fieldClass.GHOST}
               onClick={() => setStep((value) => value - 1)}
             >
               Back
             </button>
           ) : null}
-          {step < 4 ? (
+          {step < 2 ? (
             <button
               type="button"
               disabled={pending}
-              className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
+              className={fieldClass.BUTTON}
               onClick={() => void goNext()}
             >
-              {pending ? "Working…" : step === 2 ? "Continue to payment" : "Continue"}
+              {pending ? "Working…" : step === 0 ? "Continue to payment" : "Continue to review"}
             </button>
           ) : (
             <button
               type="button"
               disabled={pending}
-              className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
+              className={fieldClass.BUTTON}
               onClick={() => void placeDemoOrder()}
             >
               {pending ? "Placing order…" : "Place order"}
@@ -398,8 +399,8 @@ export function CheckoutWizard() {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
-      <div className="rounded-xl border border-slate-200 bg-white p-6">{body}</div>
-      <aside className="h-fit rounded-xl border border-slate-200 bg-white p-5">
+      <div className="rounded-md border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">{body}</div>
+      <aside className="h-fit rounded-md border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
         <h2 className="text-lg font-semibold text-navy">Order total</h2>
         <p className="mt-1 text-xs text-slate-500">Calculated on the server from live cart prices.</p>
         <dl className="mt-4 space-y-2 text-sm">
@@ -624,7 +625,7 @@ function StripePaymentFields({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+          className={fieldClass.GHOST}
           onClick={onBack}
         >
           Back
@@ -632,7 +633,7 @@ function StripePaymentFields({
         <button
           type="submit"
           disabled={pending || !stripe || !ready}
-          className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
+          className={fieldClass.BUTTON}
         >
           {pending ? "Processing…" : ready ? "Place order" : "Loading payment…"}
         </button>

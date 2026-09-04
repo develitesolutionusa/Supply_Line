@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Toast } from "@/components/ui/Toast";
+import { PanelSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderStatusBadge, formatDate } from "@/components/ui/StatusBadge";
 import { emitCartUpdated } from "@/lib/cart/client";
+import { shortOrderId } from "@/lib/catalog/display";
 import { formatCents } from "@/lib/pricing";
+import { fieldClass } from "@/lib/ui";
 import type { OrderRecord } from "@/types/commerce";
 
 type PreviewItem = {
@@ -78,14 +81,14 @@ export function ReorderView() {
     }
   }
 
-  if (!orders) return <p className="text-sm text-slate-600">Loading past orders…</p>;
+  if (!orders) return <PanelSkeleton label="Loading past orders" />;
 
   if (orders.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
         <h2 className="text-lg font-semibold text-navy">No past orders yet</h2>
         <p className="mt-2 text-sm text-slate-600">Place an order, then you can repeat it here with live prices.</p>
-        <Link href="/catalog" className="mt-6 inline-flex h-11 items-center rounded-lg bg-navy px-5 text-sm font-semibold text-white">
+        <Link href="/catalog" className={`${fieldClass.BUTTON} mt-6`}>
           Browse catalog
         </Link>
       </div>
@@ -100,12 +103,13 @@ export function ReorderView() {
             <button
               type="button"
               onClick={() => void selectOrder(order.id)}
-              className={`w-full rounded-xl border px-4 py-3 text-left ${
-                selected === order.id ? "border-navy bg-white" : "border-slate-200 bg-white hover:border-sky"
+              className={`w-full rounded-md border px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky ${
+                selected === order.id ? "border-sky bg-sky/5" : "border-slate-200 bg-white hover:border-sky"
               }`}
+              aria-pressed={selected === order.id}
             >
               <span className="flex items-center justify-between gap-2">
-                <span className="font-mono text-sm font-semibold text-navy">{order.id}</span>
+                <span className="font-mono text-sm font-semibold text-navy">{shortOrderId(order.id)}</span>
                 <OrderStatusBadge status={order.status} />
               </span>
               <span className="mt-1 block text-xs text-slate-500">{formatDate(order.created_at)}</span>
@@ -118,14 +122,14 @@ export function ReorderView() {
         {!selected ? (
           <p className="text-sm text-slate-600">Select an order to review current stock and pricing.</p>
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white">
+          <div className="rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
             <ul className="divide-y divide-slate-100">
               {items.map((item) => (
                 <li key={item.product_id} className="px-4 py-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-semibold text-navy">{item.current_name}</p>
-                      <p className="font-mono text-xs text-slate-500">{item.sku}</p>
+                      <p className="font-mono text-xs text-slate-500">SKU: {item.sku} · previous qty {item.cases}</p>
                       {item.out_of_stock ? (
                         <p className="mt-1 text-xs text-rose-700">Out of stock — skipped on reorder</p>
                       ) : null}
@@ -165,10 +169,10 @@ export function ReorderView() {
               <button
                 type="button"
                 disabled={pending}
-                className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white hover:bg-navy-muted disabled:bg-slate-300"
+                className={fieldClass.BUTTON}
                 onClick={() => void reorderAll()}
               >
-                {pending ? "Adding…" : "Reorder all available"}
+                {pending ? "Adding…" : "Reorder all"}
               </button>
             </div>
           </div>

@@ -90,7 +90,7 @@ export function ProductEditor({
 
   return (
     <form
-      className="space-y-4 rounded-xl border border-slate-200 bg-white p-5"
+      className="space-y-4 rounded-md border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]"
       onSubmit={(event) => {
         event.preventDefault();
         void save();
@@ -158,7 +158,7 @@ export function ProductEditor({
         Active
       </label>
       <fieldset>
-        <legend className="text-sm font-medium text-navy">Price tiers (cents per case)</legend>
+        <legend className="text-sm font-medium text-navy">Wholesale volume discounts (cents per case)</legend>
         <div className="mt-2 space-y-2">
           {form.tiers.map((tier, index) => (
             <div key={index} className="flex gap-2">
@@ -189,7 +189,7 @@ export function ProductEditor({
         </div>
         <button
           type="button"
-          className="mt-2 text-sm font-semibold text-sky-dark hover:underline"
+          className="mt-2 text-sm font-semibold text-sky-text hover:underline"
           onClick={() =>
             setForm({
               ...form,
@@ -221,12 +221,12 @@ export function ProductEditor({
         <button
           type="submit"
           disabled={pending}
-          className="h-11 rounded-lg bg-navy px-5 text-sm font-semibold text-white disabled:bg-slate-300"
+          className={fieldClass.BUTTON}
         >
           {pending ? "Saving…" : "Save product"}
         </button>
         {product ? (
-          <button type="button" className="h-11 rounded-lg border border-slate-200 px-4 text-sm" onClick={() => void archive()}>
+          <button type="button" className={fieldClass.GHOST} onClick={() => void archive()}>
             Archive
           </button>
         ) : null}
