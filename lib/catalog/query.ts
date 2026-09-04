@@ -1,3 +1,4 @@
+import { pageBounds, productSearchFilter } from "@/lib/catalog/search";
 import { CATEGORIES, PRODUCTS } from "@/lib/catalog/seed";
 import { deriveStockStatus, startingCasePrice } from "@/lib/pricing";
 import { assertNoError, createServiceClient } from "@/lib/supabase/server";
@@ -22,13 +23,6 @@ type ProductRow = {
   price_tiers: { min_cases: number; price_per_case_cents: number }[] | null;
   inventory: { quantity_on_hand: number; low_stock_threshold: number }[] | null;
 };
-
-function matchesSearch(product: Product, search: string) {
-  const q = search.trim().toLowerCase();
-  if (!q) return true;
-  const sku = product.sku.toLowerCase();
-  return product.name.toLowerCase().includes(q) || sku === q || sku.startsWith(q);
-}
 
 function mapProduct(row: ProductRow): Product {
   const inventory = row.inventory ?? [];
@@ -75,8 +69,15 @@ export async function catalogTables() {
 }
 
 export async function listCategories(): Promise<Category[]> {
-  const { categories } = await catalogTables();
-  return categories;
+  const supabase = createServiceClient();
+  const { data: categories, error } = await supabase.from("categories").select("id, name, slug, description");
+  assertNoError(error, "Could not load categories");
+  const order = CATEGORIES.map((category) => category.slug);
+  return [...(categories ?? [])].sort((a, b) => {
+    const left = order.indexOf(a.slug);
+    const right = order.indexOf(b.slug);
+    return (left === -1 ? 999 : left) - (right === -1 ? 999 : right);
+  }) as Category[];
 }
 
 export async function hydrateProduct(
@@ -85,9 +86,8 @@ export async function hydrateProduct(
   inventory?: Record<string, number>,
   categories?: Category[],
 ): Promise<ResolvedProduct> {
-  const qtyMap = inventory ?? (await catalogTables()).inventory;
-  const cats = categories ?? (await catalogTables()).categories;
-  const quantity = qtyMap[product.id] ?? product.quantity_on_hand;
+  const quantity = inventory?.[product.id] ?? product.quantity_on_hand;
+  const cats = categories ?? (await listCategories());
   const category = cats.find((item) => item.id === product.category_id);
   if (!category) {
     throw new Error(`Missing category ${product.category_id}`);
@@ -102,6 +102,9 @@ export async function hydrateProduct(
   };
 }
 
+const PRODUCT_SELECT =
+  "id, sku, name, category_id, description, image_url, pack_size, unit_count, is_active, price_tiers(min_cases, price_per_case_cents), inventory(quantity_on_hand, low_stock_threshold)";
+
 export async function listProducts(options: {
   category?: string;
   search?: string;
@@ -110,30 +113,44 @@ export async function listProducts(options: {
   accountTier: AccountTier;
   includeInactive?: boolean;
 }) {
-  const page = Math.max(1, options.page ?? 1);
-  const limit = Math.min(48, Math.max(1, options.limit ?? 12));
+  const requestedPage = Math.max(1, options.page ?? 1);
+  const requestedLimit = Math.min(48, Math.max(1, options.limit ?? 12));
   const category = options.category?.trim();
   const search = options.search?.trim();
-  const { products, categories, inventory } = await catalogTables();
+  const categories = await listCategories();
 
-  let filtered = options.includeInactive ? [...products] : products.filter((product) => product.is_active);
+  let categoryId: string | undefined;
   if (category && category !== "all") {
-    const match = categories.find((item) => item.slug === category);
-    if (match) {
-      filtered = filtered.filter((product) => product.category_id === match.id);
-    } else {
-      filtered = [];
+    categoryId = categories.find((item) => item.slug === category)?.id;
+    if (!categoryId) {
+      const { page, limit, total_pages } = pageBounds(requestedPage, requestedLimit, 0);
+      return { products: [], page, limit, total: 0, total_pages };
     }
   }
-  if (search) {
-    filtered = filtered.filter((product) => matchesSearch(product, search));
+
+  const supabase = createServiceClient();
+  let query = supabase.from("products").select(PRODUCT_SELECT, { count: "exact" });
+  if (!options.includeInactive) {
+    query = query.eq("is_active", true);
+  }
+  if (categoryId) {
+    query = query.eq("category_id", categoryId);
+  }
+  const searchFilter = search ? productSearchFilter(search) : null;
+  if (searchFilter) {
+    query = query.or(searchFilter);
   }
 
-  const total = filtered.length;
-  const start = (page - 1) * limit;
-  const slice = filtered.slice(start, start + limit);
+  const start = (requestedPage - 1) * requestedLimit;
+  const { data, error, count } = await query.order("name").range(start, start + requestedLimit - 1);
+  assertNoError(error, "Could not load products");
+  const total = count ?? (data ?? []).length;
+  const { page, limit, total_pages } = pageBounds(requestedPage, requestedLimit, total);
+
+  const products = ((data ?? []) as ProductRow[]).map(mapProduct);
+  const inventory = Object.fromEntries(products.map((product) => [product.id, product.quantity_on_hand]));
   const resolved = await Promise.all(
-    slice.map((product) => hydrateProduct(product, options.accountTier, inventory, categories)),
+    products.map((product) => hydrateProduct(product, options.accountTier, inventory, categories)),
   );
 
   return {
@@ -141,24 +158,28 @@ export async function listProducts(options: {
     page,
     limit,
     total,
-    total_pages: Math.max(1, Math.ceil(total / limit)),
+    total_pages,
   };
 }
 
 export async function getProductBySku(sku: string, accountTier: AccountTier, includeInactive = false) {
-  const { products, categories, inventory } = await catalogTables();
-  const product = products.find(
-    (item) => item.sku.toLowerCase() === sku.toLowerCase() && (includeInactive || item.is_active),
-  );
-  if (!product) return null;
-  return hydrateProduct(product, accountTier, inventory, categories);
+  const supabase = createServiceClient();
+  let query = supabase.from("products").select(PRODUCT_SELECT).ilike("sku", sku);
+  if (!includeInactive) query = query.eq("is_active", true);
+  const { data, error } = await query.maybeSingle();
+  assertNoError(error, "Could not load product");
+  if (!data) return null;
+  return hydrateProduct(mapProduct(data as ProductRow), accountTier);
 }
 
 export async function getProductById(productId: string, accountTier: AccountTier, includeInactive = false) {
-  const { products, categories, inventory } = await catalogTables();
-  const product = products.find((item) => item.id === productId && (includeInactive || item.is_active));
-  if (!product) return null;
-  return hydrateProduct(product, accountTier, inventory, categories);
+  const supabase = createServiceClient();
+  let query = supabase.from("products").select(PRODUCT_SELECT).eq("id", productId);
+  if (!includeInactive) query = query.eq("is_active", true);
+  const { data, error } = await query.maybeSingle();
+  assertNoError(error, "Could not load product");
+  if (!data) return null;
+  return hydrateProduct(mapProduct(data as ProductRow), accountTier);
 }
 
 export { PRODUCTS, CATEGORIES };

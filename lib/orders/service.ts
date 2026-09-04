@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getCartSnapshot, clearCart } from "@/lib/cart/service";
 import { notifyIfLowStockBreached } from "@/lib/inventory/alerts";
+import { pageBounds } from "@/lib/pagination";
 import { DELIVERY_METHODS, resolveCasePrice } from "@/lib/pricing";
 import { ensureAppUser, ensureBusinessAccount } from "@/lib/supabase/identity";
 import { syncClerkIdentity } from "@/lib/sync/clerk";
@@ -214,7 +215,7 @@ export async function markOrderPaid(orderId: string) {
   assertNoError(error, "Order not found");
   if (!order) throw new Error("Order not found");
   if (order.status === "paid" || order.status === "fulfilled") {
-    return mapOrder(order as OrderRow);
+    return { order: await mapOrder(order as OrderRow), newlyPaid: false };
   }
   assertStatusTransition(order.status as OrderStatus, "paid");
 
@@ -269,7 +270,7 @@ export async function markOrderPaid(orderId: string) {
     await clearCart(user.clerk_user_id);
   }
 
-  return mapOrder(updated as OrderRow);
+  return { order: await mapOrder(updated as OrderRow), newlyPaid: true };
 }
 
 export async function markOrderPaymentFailed(orderId: string) {
@@ -291,7 +292,10 @@ export async function markOrderPaymentFailed(orderId: string) {
 }
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
-  if (status === "paid") return markOrderPaid(orderId);
+  if (status === "paid") {
+    const result = await markOrderPaid(orderId);
+    return result.order;
+  }
   if (status === "payment_failed") return markOrderPaymentFailed(orderId);
   const supabase = createServiceClient();
   const { data: order, error } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
@@ -303,19 +307,34 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   return mapOrder(data as OrderRow);
 }
 
-export async function listOrdersForUser(userId: string, orgId: string | null) {
+export async function listOrdersForUser(
+  userId: string,
+  orgId: string | null,
+  options?: { page?: number; limit?: number },
+) {
   const supabase = createServiceClient();
   const user = await ensureAppUser(userId);
   const business = orgId ? await ensureBusinessAccount(orgId) : null;
-  let query = supabase.from("orders").select("*").order("created_at", { ascending: false });
+  let query = supabase.from("orders").select("*", { count: "exact" }).order("created_at", { ascending: false });
   if (business) {
     query = query.or(`user_id.eq.${user.id},business_account_id.eq.${business.id}`);
   } else {
     query = query.eq("user_id", user.id);
   }
-  const { data, error } = await query;
+  const requestedPage = Math.max(1, options?.page ?? 1);
+  const requestedLimit = Math.min(50, Math.max(1, options?.limit ?? 20));
+  const start = (requestedPage - 1) * requestedLimit;
+  const { data, error, count } = await query.range(start, start + requestedLimit - 1);
   assertNoError(error, "Could not load orders");
-  return Promise.all(((data ?? []) as OrderRow[]).map(mapOrder));
+  const total = count ?? (data ?? []).length;
+  const { page, limit, total_pages } = pageBounds(requestedPage, requestedLimit, total, 50);
+  return {
+    orders: await Promise.all(((data ?? []) as OrderRow[]).map(mapOrder)),
+    page,
+    limit,
+    total,
+    total_pages,
+  };
 }
 
 export async function listAllOrders(status?: OrderStatus) {

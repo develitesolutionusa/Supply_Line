@@ -1,7 +1,5 @@
 import { CreateOrganization } from "@clerk/nextjs";
-import { currentUser } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
-import { isBusinessAccountType } from "@/lib/auth/accountType";
+import { stampBusinessAccountType } from "@/lib/auth/stampAccountType";
 import { requireUser } from "@/lib/auth/requireUser";
 
 export const metadata = {
@@ -9,10 +7,9 @@ export const metadata = {
 };
 
 export default async function CreateOrganizationPage() {
-  await requireUser();
-  const user = await currentUser();
-  if (!isBusinessAccountType(user?.unsafeMetadata?.accountType)) {
-    redirect("/account");
+  const { userId } = await requireUser();
+  if (userId) {
+    await stampBusinessAccountType(userId);
   }
 
   return (

@@ -54,6 +54,20 @@ describe("tax and shipping", () => {
     assert.equal(totals.shipping_cents, 0);
   });
 
+  it("uses supplied tax_rules rates instead of the fallback map", () => {
+    const taxRules = { OR: 0, NV: 6.85 };
+    assert.equal(taxRateForState("NV", false, taxRules), 6.85);
+    assert.equal(taxRateForState("CA", false, taxRules), 0);
+    const totals = calculateCartTotals({
+      lineSubtotalsCents: [10000],
+      deliveryMethodId: "pickup",
+      shippingState: "NV",
+      taxExempt: false,
+      taxRules,
+    });
+    assert.equal(totals.tax_cents, 685);
+  });
+
   it("gives free standard shipping over the configured threshold", () => {
     assert.equal(shippingCentsForMethod("standard", 25_000), 0);
     assert.equal(shippingCentsForMethod("standard", 24_999), 1499);

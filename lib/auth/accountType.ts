@@ -1,9 +1,13 @@
 export type StorefrontAccountType = "individual" | "business";
 
-export function resolveAccountType(value: unknown): StorefrontAccountType {
-  return value === "business" ? "business" : "individual";
+export function resolveAccountType(
+  value: unknown,
+  extras?: { hasOrganization?: boolean },
+): StorefrontAccountType {
+  if (extras?.hasOrganization || value === "business") return "business";
+  return "individual";
 }
 
-export function isBusinessAccountType(value: unknown) {
-  return resolveAccountType(value) === "business";
+export function isBusinessAccountType(value: unknown, extras?: { hasOrganization?: boolean }) {
+  return resolveAccountType(value, extras) === "business";
 }

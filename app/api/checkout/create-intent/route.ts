@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAccountContext } from "@/lib/auth/context";
 import { attachPaymentIntent, placeOrder } from "@/lib/orders/service";
+import { ensureBusinessStripeCustomer } from "@/lib/stripe/customer";
+import { paymentIntentCreateParams } from "@/lib/stripe/payment-intent";
 import { getStripe, stripeConfigured } from "@/lib/stripe/server";
+import { getBusinessAccountByClerkOrg } from "@/lib/supabase/identity";
+import { logError } from "@/lib/observability";
 
 export async function POST(request: Request) {
   const account = await getAccountContext();
@@ -56,12 +60,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Stripe is not configured" }, { status: 500 });
     }
 
-    const intent = await stripe.paymentIntents.create({
-      amount: order.total_cents,
-      currency: "usd",
-      automatic_payment_methods: { enabled: true },
-      metadata: { order_id: order.id, user_id: account.userId },
-    });
+    let customerId: string | undefined;
+    if (account.orgId) {
+      const business = await getBusinessAccountByClerkOrg(account.orgId);
+      if (business) {
+        customerId =
+          (await ensureBusinessStripeCustomer({
+            account: business,
+            email: account.email,
+            name: account.fullName,
+          })) ?? undefined;
+      }
+    }
+
+    const intent = await stripe.paymentIntents.create(
+      paymentIntentCreateParams({
+        amountCents: order.total_cents,
+        orderId: order.id,
+        userId: account.userId,
+        customerId,
+      }),
+    );
 
     await attachPaymentIntent(order.id, intent.id);
 
@@ -71,6 +90,7 @@ export async function POST(request: Request) {
       payment_mode: "stripe" as const,
     });
   } catch (error) {
+    logError("checkout.create-intent", error, { userId: account.userId });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not create payment" },
       { status: 400 },

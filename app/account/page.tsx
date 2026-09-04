@@ -17,7 +17,9 @@ export default async function AccountPage() {
     currentUser(),
     account.userId ? listAddresses(account.userId) : Promise.resolve([]),
   ]);
-  const accountType = resolveAccountType(user?.unsafeMetadata?.accountType);
+  const accountType = resolveAccountType(user?.unsafeMetadata?.accountType, {
+    hasOrganization: Boolean(account.orgId),
+  });
   const isBusiness = accountType === "business";
 
   return (
@@ -61,12 +63,12 @@ export default async function AccountPage() {
         >
           My orders
         </Link>
-        {isBusiness && !account.orgId ? (
+        {!account.orgId ? (
           <Link
             href="/create-organization"
             className="inline-flex h-11 items-center rounded-lg border border-slate-200 bg-white px-5 text-sm font-semibold text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
           >
-            Create company
+            {isBusiness ? "Create company" : "Upgrade to business"}
           </Link>
         ) : null}
       </div>

@@ -10,4 +10,9 @@ describe("account type", () => {
     assert.equal(isBusinessAccountType("individual"), false);
     assert.equal(isBusinessAccountType("business"), true);
   });
+
+  it("treats an organization membership as a business account", () => {
+    assert.equal(resolveAccountType("individual", { hasOrganization: true }), "business");
+    assert.equal(isBusinessAccountType(undefined, { hasOrganization: true }), true);
+  });
 });

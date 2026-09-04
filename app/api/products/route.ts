@@ -4,7 +4,7 @@ import { listProducts } from "@/lib/catalog/query";
 import { withPublicRateLimit } from "@/lib/http";
 
 export async function GET(request: Request) {
-  const limited = withPublicRateLimit(request, "products");
+  const limited = await withPublicRateLimit(request, "products");
   if (limited) return limited;
 
   const { searchParams } = new URL(request.url);

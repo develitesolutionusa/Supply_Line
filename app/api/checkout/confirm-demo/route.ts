@@ -27,7 +27,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  const paid = await markOrderPaid(order.id);
-  await sendOrderConfirmation(paid, account.email);
+  const { order: paid, newlyPaid } = await markOrderPaid(order.id);
+  if (newlyPaid) {
+    await sendOrderConfirmation(paid, account.email);
+  }
   return NextResponse.json({ order: paid });
 }

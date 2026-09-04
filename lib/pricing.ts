@@ -3,7 +3,9 @@ import type { AccountTier, CartTotals, DeliveryMethod, PriceTier, StockStatus } 
 export const FREE_SHIPPING_THRESHOLD_CENTS = 25_000;
 export const FLAT_SHIPPING_CENTS = 1_499;
 
-export const TAX_RULES: Record<string, number> = {
+export type TaxRuleMap = Record<string, number>;
+
+export const TAX_RULES: TaxRuleMap = {
   CA: 7.25,
   NY: 8,
   TX: 6.25,
@@ -72,9 +74,13 @@ export function deriveStockStatus(quantityOnHand: number, lowStockThreshold: num
   return "in_stock";
 }
 
-export function taxRateForState(stateCode: string | undefined, taxExempt: boolean): number {
+export function taxRateForState(
+  stateCode: string | undefined,
+  taxExempt: boolean,
+  taxRules: TaxRuleMap = TAX_RULES,
+): number {
   if (taxExempt || !stateCode) return 0;
-  return TAX_RULES[stateCode.toUpperCase()] ?? 0;
+  return taxRules[stateCode.toUpperCase()] ?? 0;
 }
 
 export function shippingCentsForMethod(
@@ -93,10 +99,11 @@ export function calculateCartTotals(options: {
   deliveryMethodId: string;
   shippingState?: string;
   taxExempt: boolean;
+  taxRules?: TaxRuleMap;
 }): CartTotals {
   const subtotal_cents = options.lineSubtotalsCents.reduce((sum, value) => sum + value, 0);
   const shipping_cents = shippingCentsForMethod(options.deliveryMethodId, subtotal_cents);
-  const rate = taxRateForState(options.shippingState, options.taxExempt);
+  const rate = taxRateForState(options.shippingState, options.taxExempt, options.taxRules);
   const tax_cents = Math.round((subtotal_cents * rate) / 100);
   const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD_CENTS - subtotal_cents);
 

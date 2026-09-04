@@ -1,12 +1,16 @@
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  deactivateClerkOrg,
+  deactivateClerkUser,
   syncClerkIdentity,
   unlinkClerkMembership,
   upsertClerkOrg,
   upsertClerkUser,
 } from "@/lib/sync/clerk";
 import { isAdminLoginEmail } from "@/lib/auth/admin";
+import { withPublicRateLimit } from "@/lib/http";
+import { logError, logInfo } from "@/lib/observability";
 
 type MembershipPayload = {
   organization?: { id?: string; name?: string };
@@ -27,6 +31,9 @@ function membershipFrom(data: unknown): { clerkUserId: string; clerkOrgId: strin
 }
 
 export async function POST(request: NextRequest) {
+  const limited = await withPublicRateLimit(request, "clerk-webhook", 180);
+  if (limited) return limited;
+
   try {
     const signingSecret =
       process.env.CLERK_WEBHOOK_SIGNING_SECRET || process.env.CLERK_WEBHOOK_SECRET;
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Missing Clerk webhook signing secret");
     }
     const event = await verifyWebhook(request, { signingSecret });
-    console.info("[clerk webhook]", { type: event.type });
+    logInfo("clerk.webhook", { type: event.type });
 
     if (event.type === "user.created" || event.type === "user.updated") {
       const email =
@@ -81,9 +88,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (event.type === "user.deleted" && event.data.id) {
+      await deactivateClerkUser(event.data.id);
+    }
+
+    if (event.type === "organization.deleted" && event.data.id) {
+      await deactivateClerkOrg(event.data.id);
+    }
+
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("[clerk webhook] failed", error);
+    logError("clerk.webhook", error);
     return NextResponse.json({ error: "Invalid webhook" }, { status: 400 });
   }
 }

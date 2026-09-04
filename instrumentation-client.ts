@@ -5,6 +5,15 @@ if (dsn) {
   Sentry.init({
     dsn,
     tracesSampleRate: 0.1,
+    enableLogs: true,
     sendDefaultPii: false,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 1,
+    integrations: [
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+    ],
   });
 }

@@ -1,5 +1,6 @@
 import { getProductById, getProductBySku } from "@/lib/catalog/query";
 import { calculateCartTotals, resolveCasePrice } from "@/lib/pricing";
+import { loadTaxRules } from "@/lib/tax/rules";
 import { ensureAppUser } from "@/lib/supabase/identity";
 import { assertNoError, createServiceClient } from "@/lib/supabase/server";
 import type { AccountTier, CartItemRecord } from "@/types/commerce";
@@ -68,6 +69,7 @@ export async function getCartSnapshot(options: {
     deliveryMethodId,
     shippingState: options.shippingState,
     taxExempt: options.taxExempt,
+    taxRules: await loadTaxRules(),
   });
 
   return {
@@ -78,10 +80,25 @@ export async function getCartSnapshot(options: {
   };
 }
 
+async function assertCasesAvailable(productId: string, cases: number) {
+  const product = await getProductById(productId, "individual", true);
+  if (!product?.is_active) {
+    throw new Error("Product is unavailable.");
+  }
+  if (product.quantity_on_hand < cases) {
+    throw new Error(
+      product.quantity_on_hand <= 0
+        ? "Out of stock."
+        : `Only ${product.quantity_on_hand} cases available.`,
+    );
+  }
+}
+
 export async function upsertCartItem(userId: string, productId: string, cases: number) {
   if (!Number.isInteger(cases) || cases < 1) {
     throw new Error("Cases must be a positive integer.");
   }
+  await assertCasesAvailable(productId, cases);
 
   const supabase = createServiceClient();
   const { cart } = await getOrCreateCart(userId);
@@ -133,6 +150,16 @@ export async function updateCartItem(userId: string, itemId: string, cases: numb
 
   const supabase = createServiceClient();
   const { cart } = await getOrCreateCart(userId);
+  const { data: existing, error: existingError } = await supabase
+    .from("cart_items")
+    .select("product_id")
+    .eq("id", itemId)
+    .eq("cart_id", cart.id)
+    .maybeSingle();
+  assertNoError(existingError, "Could not load cart item");
+  if (!existing) throw new Error("Cart item not found.");
+  await assertCasesAvailable(existing.product_id, cases);
+
   const { data, error } = await supabase
     .from("cart_items")
     .update({ cases })
@@ -186,8 +213,17 @@ export async function bulkAddBySku(
       results.push({ sku, qty, ok: false, reason: "Out of stock" });
       continue;
     }
-    await addCasesToCart(userId, product.id, qty);
-    results.push({ sku, qty, ok: true });
+    try {
+      await addCasesToCart(userId, product.id, qty);
+      results.push({ sku, qty, ok: true });
+    } catch (error) {
+      results.push({
+        sku,
+        qty,
+        ok: false,
+        reason: error instanceof Error ? error.message : "Could not add to cart",
+      });
+    }
   }
 
   return results;

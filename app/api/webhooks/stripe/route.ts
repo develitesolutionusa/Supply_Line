@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getOrder, getOrderByPaymentIntent, markOrderPaid, markOrderPaymentFailed } from "@/lib/orders/service";
 import { sendOrderConfirmation } from "@/lib/email";
+import { logError, logInfo } from "@/lib/observability";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
+import { stripeWebhookAction } from "@/lib/stripe/webhook";
 
 export async function POST(request: Request) {
   const stripe = getStripe();
@@ -24,19 +26,28 @@ export async function POST(request: Request) {
   try {
     event = stripe.webhooks.constructEvent(body, signature, secret);
   } catch (error) {
-    console.error("[stripe webhook] signature failed", error);
+    logError("stripe.webhook.signature", error);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  console.info("[stripe webhook]", { type: event.type, id: event.id });
+  logInfo("stripe.webhook", { type: event.type, id: event.id });
 
   try {
-    if (event.type === "payment_intent.succeeded") {
-      const intent = event.data.object;
-      const orderId = intent.metadata.order_id;
-      const order = orderId ? await getOrder(orderId) : await getOrderByPaymentIntent(intent.id);
-      if (order) {
-        const paid = await markOrderPaid(order.id);
+    const action = stripeWebhookAction(event);
+    if (action.action === "ignore") {
+      return NextResponse.json({ received: true });
+    }
+
+    const order = action.orderId
+      ? await getOrder(action.orderId)
+      : await getOrderByPaymentIntent(action.paymentIntentId);
+    if (!order) {
+      return NextResponse.json({ received: true });
+    }
+
+    if (action.action === "mark_paid") {
+      const { order: paid, newlyPaid } = await markOrderPaid(order.id);
+      if (newlyPaid) {
         const supabase = createServiceClient();
         const { data: buyer } = await supabase
           .from("users")
@@ -45,17 +56,11 @@ export async function POST(request: Request) {
           .maybeSingle();
         await sendOrderConfirmation(paid, buyer?.email ?? null);
       }
-    }
-    if (event.type === "payment_intent.payment_failed") {
-      const intent = event.data.object;
-      const orderId = intent.metadata.order_id;
-      const order = orderId ? await getOrder(orderId) : await getOrderByPaymentIntent(intent.id);
-      if (order) {
-        await markOrderPaymentFailed(order.id);
-      }
+    } else {
+      await markOrderPaymentFailed(order.id);
     }
   } catch (error) {
-    console.error("[stripe webhook] handler failed", error);
+    logError("stripe.webhook.handler", error, { type: event.type, id: event.id });
     return NextResponse.json({ error: "Handler failed" }, { status: 500 });
   }
 

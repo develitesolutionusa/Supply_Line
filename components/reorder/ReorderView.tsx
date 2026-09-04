@@ -30,7 +30,7 @@ export function ReorderView() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    fetch("/api/orders")
+    fetch("/api/orders?limit=50")
       .then(async (response) => {
         if (response.status === 401) {
           window.location.href = "/sign-in?redirect_url=/reorder";
