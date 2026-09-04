@@ -7,11 +7,16 @@ import { logError, logInfo } from "@/lib/observability";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
 import { stripeWebhookAction } from "@/lib/stripe/webhook";
+import { withWebhookRateLimit } from "@/lib/http";
 
 export async function POST(request: Request) {
+  const limited = await withWebhookRateLimit(request, "webhook:stripe");
+  if (limited) return limited;
+
   const stripe = getStripe();
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!stripe || !secret) {
+    logError("stripe.webhook.config", new Error("Stripe webhook is not configured"));
     return NextResponse.json({ error: "Stripe webhook is not configured" }, { status: 501 });
   }
 

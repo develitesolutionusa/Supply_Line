@@ -1,45 +1,40 @@
 import { TAX_RULES, type TaxRuleMap } from "@/lib/pricing";
+import { logError } from "@/lib/observability";
 import { createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
-const CACHE_MS = 60_000;
-let cached: { at: number; rules: TaxRuleMap } | null = null;
+type TaxRuleRow = {
+  state_code?: string | null;
+  rate_percent?: number | string | null;
+};
 
-export function taxRulesFromRows(rows: { state_code: string; rate_percent: number }[]): TaxRuleMap {
+export function taxRulesFromRows(rows: TaxRuleRow[]): TaxRuleMap {
   const rules: TaxRuleMap = {};
   for (const row of rows) {
-    const code = row.state_code.trim().toUpperCase();
-    if (!code) continue;
-    rules[code] = Number(row.rate_percent);
+    const state = row.state_code?.trim().toUpperCase();
+    if (!state) continue;
+    const rate = typeof row.rate_percent === "number" ? row.rate_percent : Number(row.rate_percent);
+    if (!Number.isFinite(rate)) continue;
+    rules[state] = rate;
   }
   return rules;
 }
 
-export function clearTaxRulesCache() {
-  cached = null;
-}
-
 export async function loadTaxRules(): Promise<TaxRuleMap> {
-  if (cached && Date.now() - cached.at < CACHE_MS) {
-    return cached.rules;
-  }
-
   if (!isSupabaseConfigured()) {
-    return { ...TAX_RULES };
+    return TAX_RULES;
   }
 
   try {
     const supabase = createServiceClient();
     const { data, error } = await supabase.from("tax_rules").select("state_code, rate_percent");
-    if (error || !data?.length) {
-      const fallback = { ...TAX_RULES };
-      cached = { at: Date.now(), rules: fallback };
-      return fallback;
+    if (error) {
+      logError("tax.loadTaxRules", error);
+      return TAX_RULES;
     }
-    const rules = taxRulesFromRows(data);
-    const resolved = Object.keys(rules).length > 0 ? rules : { ...TAX_RULES };
-    cached = { at: Date.now(), rules: resolved };
-    return resolved;
-  } catch {
-    return { ...TAX_RULES };
+    const mapped = taxRulesFromRows(data ?? []);
+    return Object.keys(mapped).length > 0 ? mapped : TAX_RULES;
+  } catch (error) {
+    logError("tax.loadTaxRules", error);
+    return TAX_RULES;
   }
 }

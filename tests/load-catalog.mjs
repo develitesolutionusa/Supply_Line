@@ -1,4 +1,4 @@
-const base = process.env.LOAD_TEST_URL || "http://localhost:3000";
+const base = process.env.LOAD_TEST_BASE_URL || process.env.LOAD_TEST_URL || "http://localhost:3000";
 const rounds = Number(process.env.LOAD_TEST_ROUNDS || 25);
 
 async function hit(path) {
@@ -7,7 +7,12 @@ async function hit(path) {
   return { path, status: response.status, ms: Date.now() - started };
 }
 
-const paths = ["/api/categories", "/api/products?limit=12", "/api/admin/metrics"];
+const paths = [
+  "/api/categories",
+  "/api/products?limit=12",
+  "/api/products?search=cups&limit=12",
+  "/api/admin/metrics",
+];
 const results = [];
 
 for (let i = 0; i < rounds; i += 1) {
@@ -20,7 +25,7 @@ const byPath = Object.fromEntries(
   paths.map((path) => {
     const rows = results.filter((row) => row.path === path);
     const ok = rows.filter((row) => row.status < 500).length;
-    const avg = Math.round(rows.reduce((sum, row) => sum + row.ms, 0) / rows.length);
+    const avg = Math.round(rows.reduce((sum, row) => row.ms + sum, 0) / rows.length);
     return [path, { requests: rows.length, non_5xx: ok, avg_ms: avg }];
   }),
 );

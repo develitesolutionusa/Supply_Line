@@ -325,19 +325,15 @@ Tables to create (in dependency order):
 ## Phase B8 — Hardening & Observability
 **Goal:** Production readiness.
 
-- [x] Sentry (or equivalent) wired into both frontend and API routes (`@sentry/nextjs`, `onRequestError`, webhook/API `captureException`, error-only session replay). Set `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` in preview/production.
-- [x] Rate limiting on public/auth-adjacent routes (search, sign-up-adjacent webhooks) — Upstash Redis or in-memory fallback
-- [x] Structured logging on all webhook handlers (Stripe, Clerk) — these fail silently in production if unmonitored
+- [x] Sentry wired into frontend and API routes (`withSentryConfig`, `onRequestError`, webhook/API `captureException`, error-only session replay). Set `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` in preview/production; optional `SENTRY_AUTH_TOKEN` for source maps.
+- [x] Rate limiting on public search (`/api/products?search=`) and Clerk/Stripe webhooks — Upstash Redis or in-memory fallback
+- [x] Structured logging on all webhook handlers (Stripe, Clerk) — `logInfo` / `logError` (Sentry breadcrumbs + `captureException`)
 - [x] Automated tests:
   - Unit tests on `lib/pricing.ts` (tier boundaries, business vs retail, tax-exempt cases) — highest priority, highest cost-of-bug area
   - [x] Integration tests on checkout flow using Stripe test clocks/test cards (`npm run test:integration`, skipped unless `STRIPE_SECRET_KEY` is `sk_test_`)
-  - [x] RLS policy tests (attempt cross-account reads, expect denial)
+  - [x] RLS policy tests (attempt cross-account reads, expect denial) — `npm run db:rls`
 - [x] Load-test script for catalog search and admin metrics (`npm run load:test` against `LOAD_TEST_BASE_URL`, default localhost)
-- [x] Backup/retention policy:
-  - Daily automated backups on the Supabase project (Pro: PITR; Free: keep daily backups for at least 7 days)
-  - Do not use production as a scratch database; apply schema only via `/supabase/migrations`
-  - Confirm in the Supabase dashboard: **Project Settings → Database → Backups** before each production release
-- [x] Staging = Vercel Preview env (see `.env.preview.example`). Mirror production services with test-mode Stripe. QA on the preview URL before promoting `main`.
+- [x] Backup/retention + staging checklist in `docs/operations.md` (and `.env.preview.example`)
 
 **Done when:** Core money-path logic (pricing, checkout, webhooks) has test coverage, and failures anywhere in the Stripe/Clerk webhook chain are visible in Sentry/logs, not silent.
 

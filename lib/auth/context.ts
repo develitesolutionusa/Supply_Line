@@ -15,18 +15,14 @@ export type AccountContext = {
   fullName: string | null;
 };
 
-type ClerkOrgMemberships = {
-  organizationMemberships?: Array<{ organization?: { id?: string } }>;
-};
-
 export async function getAccountContext(): Promise<AccountContext> {
   const { userId, orgId } = await auth();
   const user = userId ? await currentUser() : null;
-  const memberships = (user as ClerkOrgMemberships | null)?.organizationMemberships ?? [];
-  const hasOrganization = Boolean(orgId || memberships.length > 0);
-  const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType, { hasOrganization });
+  const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType, {
+    hasOrganization: Boolean(orgId),
+  });
   const accountTier: AccountTier = isBusiness ? "business" : "individual";
-  const activeOrgId = isBusiness ? (orgId ?? memberships[0]?.organization?.id ?? null) : null;
+  const activeOrgId = isBusiness ? (orgId ?? null) : null;
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
   const isAdmin = hasAdminLoginEmail([
     email,

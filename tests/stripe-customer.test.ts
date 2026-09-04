@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { stripeCustomerCreateParams } from "../lib/stripe/customer";
+import { stripeBuyerCustomerCreateParams, stripeCustomerCreateParams } from "../lib/stripe/customer";
 
 describe("stripe customer params", () => {
   it("tags the Stripe customer with the business account and org", () => {
@@ -40,5 +40,37 @@ describe("stripe customer params", () => {
     assert.equal(params.email, undefined);
     assert.equal(params.name, "Solo Cafe");
     assert.equal(params.metadata.clerk_org_id, "");
+  });
+});
+
+describe("stripe buyer customer params", () => {
+  it("tags an individual checkout customer with the app user", () => {
+    const params = stripeBuyerCustomerCreateParams({
+      user: { id: "usr_1", clerk_user_id: "user_abc" },
+      email: "buyer@example.com",
+      name: "Pat Buyer",
+    });
+
+    assert.equal(params.email, "buyer@example.com");
+    assert.equal(params.name, "Pat Buyer");
+    assert.equal(params.metadata.user_id, "usr_1");
+    assert.equal(params.metadata.clerk_user_id, "user_abc");
+  });
+
+  it("falls back to email then a generic name", () => {
+    const withEmail = stripeBuyerCustomerCreateParams({
+      user: { id: "usr_2", clerk_user_id: "user_def" },
+      email: "solo@example.com",
+      name: null,
+    });
+    assert.equal(withEmail.name, "solo@example.com");
+
+    const anonymous = stripeBuyerCustomerCreateParams({
+      user: { id: "usr_3", clerk_user_id: "user_ghi" },
+      email: null,
+      name: null,
+    });
+    assert.equal(anonymous.name, "SupplyLine buyer");
+    assert.equal(anonymous.email, undefined);
   });
 });

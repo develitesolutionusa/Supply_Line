@@ -16,7 +16,7 @@ export default async function AdminPage() {
         <MetricCard label="Sales (30d)" value={formatCents(metrics.sales_cents)} />
         <MetricCard label="Pending orders" value={String(metrics.pending_orders)} />
         <MetricCard label="Avg order value" value={formatCents(metrics.avg_order_value_cents)} />
-        <MetricCard label="Business accounts" value={String(metrics.new_accounts)} />
+        <MetricCard label="New accounts (30d)" value={String(metrics.new_accounts)} />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">

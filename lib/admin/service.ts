@@ -1,38 +1,73 @@
 import { randomUUID } from "node:crypto";
 import { catalogTables, hydrateProduct } from "@/lib/catalog/query";
 import { notifyIfLowStockBreached } from "@/lib/inventory/alerts";
+import {
+  ADMIN_METRICS_WINDOW_MS,
+  summarizeAdminMetrics,
+  type AdminMetricsRow,
+} from "@/lib/admin/metrics";
 import { deriveStockStatus } from "@/lib/pricing";
 import { assertNoError, createServiceClient, DEFAULT_WAREHOUSE_ID } from "@/lib/supabase/server";
 import type { OrderStatus, PriceTier, Product } from "@/types/commerce";
 
-const SALES_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+function asMetricsRow(value: unknown): AdminMetricsRow | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  if (
+    row.sales_cents == null ||
+    row.paid_orders == null ||
+    row.pending_orders == null ||
+    row.new_accounts == null
+  ) {
+    return null;
+  }
+  return {
+    sales_cents: Number(row.sales_cents),
+    paid_orders: Number(row.paid_orders),
+    pending_orders: Number(row.pending_orders),
+    new_accounts: Number(row.new_accounts),
+  };
+}
 
 export async function adminMetrics() {
   const supabase = createServiceClient();
-  const since = new Date(Date.now() - SALES_WINDOW_MS).toISOString();
-  const [{ data: orders, error: orderError }, { count, error: accountError }] = await Promise.all([
-    supabase.from("orders").select("status, total_cents, created_at"),
-    supabase.from("business_accounts").select("id", { count: "exact", head: true }),
+  const since = new Date(Date.now() - ADMIN_METRICS_WINDOW_MS).toISOString();
+  const { data, error } = await supabase.rpc("admin_dashboard_metrics", { p_since: since });
+  const aggregated = !error ? asMetricsRow(data) : null;
+  if (aggregated) {
+    return summarizeAdminMetrics(aggregated, since);
+  }
+
+  const [
+    { data: paid, error: paidError },
+    { count: pendingCount, error: pendingError },
+    { count: newAccountCount, error: accountError },
+  ] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("total_cents")
+      .in("status", ["paid", "fulfilled"])
+      .gte("created_at", since),
+    supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase
+      .from("business_accounts")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", since),
   ]);
-  assertNoError(orderError, "Could not load orders");
+  assertNoError(paidError, "Could not load sales");
+  assertNoError(pendingError, "Could not load pending orders");
   assertNoError(accountError, "Could not load accounts");
 
-  const paid = (orders ?? []).filter(
-    (order) =>
-      (order.status === "paid" || order.status === "fulfilled") &&
-      new Date(order.created_at).getTime() >= Date.now() - SALES_WINDOW_MS,
-  );
-  const sales_cents = paid.reduce((sum, order) => sum + (order.total_cents as number), 0);
-  const pending = (orders ?? []).filter((order) => order.status === "pending").length;
-
-  return {
-    sales_cents,
-    pending_orders: pending,
-    avg_order_value_cents: paid.length ? Math.round(sales_cents / paid.length) : 0,
-    new_accounts: count ?? 0,
-    window_days: 30,
+  const sales_cents = (paid ?? []).reduce((sum, order) => sum + (order.total_cents as number), 0);
+  return summarizeAdminMetrics(
+    {
+      sales_cents,
+      paid_orders: paid?.length ?? 0,
+      pending_orders: pendingCount ?? 0,
+      new_accounts: newAccountCount ?? 0,
+    },
     since,
-  };
+  );
 }
 
 export async function lowStockProducts() {

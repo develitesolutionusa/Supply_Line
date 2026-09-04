@@ -1,11 +1,14 @@
 import { createServiceClient, assertNoError } from "@/lib/supabase/server";
 
+const USER_COLUMNS = "id, clerk_user_id, email, role, business_account_id, stripe_customer_id";
+
 export type AppUser = {
   id: string;
   clerk_user_id: string;
   email: string;
   role: "admin" | "buyer" | "staff";
   business_account_id: string | null;
+  stripe_customer_id: string | null;
 };
 
 export type BusinessAccount = {
@@ -21,7 +24,7 @@ export async function ensureAppUser(clerkUserId: string, email?: string | null, 
   const supabase = createServiceClient();
   const { data: existing, error } = await supabase
     .from("users")
-    .select("id, clerk_user_id, email, role, business_account_id")
+    .select(USER_COLUMNS)
     .eq("clerk_user_id", clerkUserId)
     .maybeSingle();
   assertNoError(error, "Could not load user");
@@ -34,7 +37,7 @@ export async function ensureAppUser(clerkUserId: string, email?: string | null, 
         .from("users")
         .update({ email: nextEmail, role: nextRole })
         .eq("id", existing.id)
-        .select("id, clerk_user_id, email, role, business_account_id")
+        .select(USER_COLUMNS)
         .single();
       assertNoError(updateError, "Could not update user");
       return data as AppUser;
@@ -60,12 +63,12 @@ export async function ensureAppUser(clerkUserId: string, email?: string | null, 
       email: resolvedEmail || `${clerkUserId}@users.local`,
       role: role ?? "buyer",
     })
-    .select("id, clerk_user_id, email, role, business_account_id")
+    .select(USER_COLUMNS)
     .single();
   if (insertError?.code === "23505") {
     const { data: raced, error: racedError } = await supabase
       .from("users")
-      .select("id, clerk_user_id, email, role, business_account_id")
+      .select(USER_COLUMNS)
       .eq("clerk_user_id", clerkUserId)
       .single();
     assertNoError(racedError, "Could not load user");
@@ -155,5 +158,14 @@ export async function setBusinessStripeCustomerId(accountId: string, stripeCusto
     .from("business_accounts")
     .update({ stripe_customer_id: stripeCustomerId })
     .eq("id", accountId);
+  assertNoError(error, "Could not save Stripe customer");
+}
+
+export async function setUserStripeCustomerId(userId: string, stripeCustomerId: string) {
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("users")
+    .update({ stripe_customer_id: stripeCustomerId })
+    .eq("id", userId);
   assertNoError(error, "Could not save Stripe customer");
 }

@@ -80,7 +80,7 @@ function SignedInAccountMenu() {
   const displayName =
     user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress || "Account";
   const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType, {
-    hasOrganization: Boolean(organization || (user?.organizationMemberships?.length ?? 0) > 0),
+    hasOrganization: Boolean(organization) || (user?.organizationMemberships?.length ?? 0) > 0,
   });
   const orgName = isBusiness ? organization?.name : undefined;
   const isAdmin = hasAdminLoginEmail([
@@ -165,14 +165,14 @@ function SignedInAccountMenu() {
               Admin
             </Link>
           ) : null}
-          {!organization ? (
+          {isBusiness && !organization ? (
             <Link
               href="/create-organization"
               role="menuitem"
               className="block px-3 py-2 text-sm hover:bg-slate-50"
               onClick={() => setOpen(false)}
             >
-              {isBusiness ? "Create company" : "Upgrade to business"}
+              Create company
             </Link>
           ) : null}
           <SignOutButton>

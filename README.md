@@ -10,6 +10,15 @@ npm run dev
 
 Clerk keys live in `.env.local` (created by `clerk init`). Copy `.env.example` if you need to recreate the file.
 
+```bash
+npm test
+npm run test:integration
+npm run db:rls
+npm run load:test
+```
+
+Preview/staging env vars: `.env.preview.example`. Backup and promote checklist: [docs/operations.md](./docs/operations.md).
+
 ## Routes
 
 Public: `/`, `/catalog`, `/products/[sku]`, `/cart`, `/quick-order`, `/reorder`, `/sign-in`, `/sign-up`

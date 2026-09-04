@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAccountContext } from "@/lib/auth/context";
 import { attachPaymentIntent, placeOrder } from "@/lib/orders/service";
-import { ensureBusinessStripeCustomer } from "@/lib/stripe/customer";
+import { ensureCheckoutStripeCustomer } from "@/lib/stripe/customer";
 import { paymentIntentCreateParams } from "@/lib/stripe/payment-intent";
 import { getStripe, stripeConfigured } from "@/lib/stripe/server";
-import { getBusinessAccountByClerkOrg } from "@/lib/supabase/identity";
+import { ensureAppUser, getBusinessAccountByClerkOrg } from "@/lib/supabase/identity";
 import { logError } from "@/lib/observability";
 
 export async function POST(request: Request) {
@@ -60,18 +60,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Stripe is not configured" }, { status: 500 });
     }
 
-    let customerId: string | undefined;
-    if (account.orgId) {
-      const business = await getBusinessAccountByClerkOrg(account.orgId);
-      if (business) {
-        customerId =
-          (await ensureBusinessStripeCustomer({
-            account: business,
-            email: account.email,
-            name: account.fullName,
-          })) ?? undefined;
-      }
-    }
+    const user = await ensureAppUser(account.userId, account.email);
+    const business = account.orgId ? await getBusinessAccountByClerkOrg(account.orgId) : null;
+    const customerId =
+      (await ensureCheckoutStripeCustomer({
+        user,
+        business,
+        email: account.email,
+        name: account.fullName,
+      })) ?? undefined;
 
     const intent = await stripe.paymentIntents.create(
       paymentIntentCreateParams({

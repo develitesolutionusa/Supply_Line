@@ -434,6 +434,7 @@ export type Database = {
           business_account_id: string | null
           role: Database["public"]["Enums"]["user_role"]
           email: string
+          stripe_customer_id: string | null
           created_at: string
         }
         Insert: {
@@ -442,6 +443,7 @@ export type Database = {
           business_account_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           email: string
+          stripe_customer_id?: string | null
           created_at?: string
         }
         Update: {
@@ -450,6 +452,7 @@ export type Database = {
           business_account_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           email?: string
+          stripe_customer_id?: string | null
           created_at?: string
         }
         Relationships: [
@@ -493,6 +496,7 @@ export type Database = {
     Functions: {
       current_app_user: { Args: Record<PropertyKey, never>; Returns: Database["public"]["Tables"]["users"]["Row"] }
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      admin_dashboard_metrics: { Args: { p_since: string }; Returns: Json }
     }
     Enums: {
       account_tier: "business" | "individual"

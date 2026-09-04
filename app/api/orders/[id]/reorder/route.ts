@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAccountContext } from "@/lib/auth/context";
 import { addCasesToCart } from "@/lib/cart/service";
+import { canAccessOrder } from "@/lib/orders/access";
 import { reorderPreview } from "@/lib/orders/service";
 
 export async function GET(
@@ -13,7 +14,7 @@ export async function GET(
   }
   const { id } = await context.params;
   const preview = await reorderPreview(id, account.accountTier);
-  if (!preview || (preview.order.user_id !== account.userId && preview.order.org_id !== account.orgId)) {
+  if (!preview || !canAccessOrder(account, preview.order)) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
   return NextResponse.json(preview);
@@ -30,7 +31,7 @@ export async function POST(
   const { id } = await context.params;
   const body = (await request.json()) as { items?: { product_id: string; cases: number }[] };
   const preview = await reorderPreview(id, account.accountTier);
-  if (!preview) {
+  if (!preview || !canAccessOrder(account, preview.order)) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
