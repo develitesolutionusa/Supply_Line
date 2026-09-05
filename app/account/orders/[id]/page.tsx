@@ -4,7 +4,7 @@ import { OrderStatusBadge, formatDate } from "@/components/ui/StatusBadge";
 import { getAccountContext } from "@/lib/auth/context";
 import { requireUser } from "@/lib/auth/requireUser";
 import { getOrder } from "@/lib/orders/service";
-import { DELIVERY_METHODS, formatCents } from "@/lib/pricing";
+import { DELIVERY_METHODS, formatCents, requiresDeliveryLocation } from "@/lib/pricing";
 import { fieldClass } from "@/lib/ui";
 import { shortOrderId } from "@/lib/catalog/display";
 
@@ -37,9 +37,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       <p className="mt-2 text-sm text-slate-600">
         {delivery?.label ?? order.delivery_method}
         {order.shipping_address
-          ? ` · ${order.shipping_address.city}, ${order.shipping_address.state}`
+          ? ` · ${order.shipping_address.line1}, ${order.shipping_address.city}, ${order.shipping_address.state} ${order.shipping_address.zip}`
           : null}
       </p>
+      {order.shipping_address?.label.includes(" · from ") ? (
+        <p className="mt-1 text-sm text-slate-600">
+          From {order.shipping_address.label.split(" · from ")[1]}
+        </p>
+      ) : null}
       <ul className="mt-8 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
         {order.items.map((item) => (
           <li key={item.sku} className="flex justify-between px-5 py-3 text-sm">
@@ -56,7 +61,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <dd>{formatCents(order.subtotal_cents)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt>Shipping</dt>
+          <dt>{requiresDeliveryLocation(order.delivery_method) ? "Delivery" : "Shipping"}</dt>
           <dd>{formatCents(order.shipping_cents)}</dd>
         </div>
         <div className="flex justify-between">

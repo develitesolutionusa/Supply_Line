@@ -8,7 +8,12 @@ import { useEffect, useMemo, useState } from "react";
 import { StepIndicator } from "@/components/ui/StepIndicator";
 import { PanelSkeleton } from "@/components/ui/PageSkeleton";
 import { emitCartUpdated } from "@/lib/cart/client";
-import { DELIVERY_METHODS, formatCents } from "@/lib/pricing";
+import {
+  DELIVERY_METHODS,
+  formatAddressLine,
+  formatCents,
+  requiresDeliveryLocation,
+} from "@/lib/pricing";
 import { fieldClass } from "@/lib/ui";
 import type { AddressRecord, CartTotals, DeliveryMethod, OrderRecord } from "@/types/commerce";
 
@@ -67,6 +72,8 @@ export function CheckoutWizard() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState<AddressDraft>(emptyAddress);
   const [delivery, setDelivery] = useState("standard");
+  const [originLocation, setOriginLocation] = useState("");
+  const [locating, setLocating] = useState(false);
   const [order, setOrder] = useState<OrderRecord | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentMode, setPaymentMode] = useState<"stripe" | "demo" | null>(null);
@@ -122,6 +129,39 @@ export function CheckoutWizard() {
     };
   }, [delivery, address.state, checkoutReady]);
 
+  async function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setError("Location is not available in this browser. Enter your current location manually.");
+      return;
+    }
+    setLocating(true);
+    setError(null);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12_000,
+        });
+      });
+      const { latitude, longitude } = position.coords;
+      const fallback = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      const response = await fetch(
+        `/api/checkout/reverse-geocode?lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        setOriginLocation(fallback);
+        return;
+      }
+      const payload = (await response.json()) as { location?: string };
+      setOriginLocation(payload.location?.trim() || fallback);
+    } catch {
+      setError("Could not read your current location. Enter it manually.");
+    } finally {
+      setLocating(false);
+    }
+  }
+
   async function createIntent() {
     setPending(true);
     setError(null);
@@ -129,7 +169,11 @@ export function CheckoutWizard() {
       const response = await fetch("/api/checkout/create-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ delivery_method: delivery, address }),
+        body: JSON.stringify({
+          delivery_method: delivery,
+          address,
+          origin_location: originLocation.trim() || undefined,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Could not start payment");
@@ -174,6 +218,10 @@ export function CheckoutWizard() {
       }
       if (!address.line1 || !address.city || !address.state || !address.zip) {
         setError("A complete shipping address is required.");
+        return;
+      }
+      if (requiresDeliveryLocation(delivery) && !originLocation.trim()) {
+        setError("Enter your current location for local or expedited delivery.");
         return;
       }
       await createIntent();
@@ -306,13 +354,32 @@ export function CheckoutWizard() {
                   checked={delivery === method.id}
                   onChange={() => setDelivery(method.id)}
                 />
-                <span>
-                  <span className="block font-medium text-navy">{method.label}</span>
+                <span className="flex-1">
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="block font-medium text-navy">{method.label}</span>
+                    <span className="shrink-0 text-sm font-semibold text-navy">
+                      {method.shipping_cents === 0
+                        ? "Free"
+                        : method.shipping_cents != null
+                          ? formatCents(method.shipping_cents)
+                          : "Calculated"}
+                    </span>
+                  </span>
                   <span className="mt-1 block text-sm text-slate-600">{method.description}</span>
                 </span>
               </label>
             ))}
           </fieldset>
+          {requiresDeliveryLocation(delivery) ? (
+            <DeliveryOriginField
+              originLocation={originLocation}
+              deliveryPoint={formatAddressLine(address)}
+              delivery={delivery}
+              locating={locating}
+              onChange={setOriginLocation}
+              onUseCurrentLocation={() => void useCurrentLocation()}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -323,6 +390,7 @@ export function CheckoutWizard() {
             email={email}
             address={address}
             delivery={delivery}
+            originLocation={originLocation}
             lines={lines}
           />
           <StripePaymentForm
@@ -351,6 +419,7 @@ export function CheckoutWizard() {
             email={email}
             address={address}
             delivery={delivery}
+            originLocation={originLocation}
             lines={lines}
           />
         </div>
@@ -409,7 +478,7 @@ export function CheckoutWizard() {
             <dd>{formatCents(displayTotals.subtotal_cents)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>Shipping</dt>
+            <dt>{requiresDeliveryLocation(delivery) ? "Delivery" : "Shipping"}</dt>
             <dd>{formatCents(displayTotals.shipping_cents)}</dd>
           </div>
           <div className="flex justify-between">
@@ -503,30 +572,98 @@ function AddressFields({
   );
 }
 
+function DeliveryOriginField({
+  originLocation,
+  deliveryPoint,
+  delivery,
+  locating,
+  onChange,
+  onUseCurrentLocation,
+}: {
+  originLocation: string;
+  deliveryPoint: string;
+  delivery: string;
+  locating: boolean;
+  onChange: (value: string) => void;
+  onUseCurrentLocation: () => void;
+}) {
+  const method = DELIVERY_METHODS.find((item) => item.id === delivery);
+  const feeLabel = method?.shipping_cents != null ? formatCents(method.shipping_cents) : "";
+
+  return (
+    <div className="space-y-3 rounded-md border border-slate-200 bg-canvas p-4">
+      <div>
+        <label className={fieldClass.LABEL} htmlFor="checkout-origin">
+          Current location
+        </label>
+        <input
+          id="checkout-origin"
+          className={fieldClass.INPUT}
+          value={originLocation}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Street, city, or GPS coordinates"
+          autoComplete="off"
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Used as the pickup point for this delivery. The destination is the shipping address above.
+        </p>
+      </div>
+      <button
+        type="button"
+        className={fieldClass.GHOST}
+        disabled={locating}
+        onClick={onUseCurrentLocation}
+      >
+        {locating ? "Finding location…" : "Use my current location"}
+      </button>
+      {originLocation.trim() && deliveryPoint ? (
+        <p className="text-sm text-slate-700">
+          {method?.label ?? "Delivery"} {feeLabel} from{" "}
+          <span className="font-medium text-navy">{originLocation.trim()}</span> to{" "}
+          <span className="font-medium text-navy">{deliveryPoint}</span>.
+        </p>
+      ) : (
+        <p className="text-sm text-slate-600">
+          {method?.label ?? "Delivery"} is {feeLabel} from your current location to the delivery address.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CheckoutReview({
   name,
   email,
   address,
   delivery,
+  originLocation,
   lines,
 }: {
   name: string;
   email: string;
   address: AddressDraft;
   delivery: string;
+  originLocation: string;
   lines: Line[];
 }) {
+  const method = DELIVERY_METHODS.find((item) => item.id === delivery);
+  const destination = formatAddressLine(address);
+
   return (
     <div className="space-y-4 text-sm">
       <p>
         <span className="font-medium text-navy">{name}</span> · {email}
       </p>
+      <p className="text-slate-600">{destination}</p>
       <p className="text-slate-600">
-        {address.line1}, {address.city}, {address.state} {address.zip}
+        Delivery: {method?.label ?? delivery}
+        {method?.shipping_cents != null ? ` · ${formatCents(method.shipping_cents)}` : ""}
       </p>
-      <p className="text-slate-600">
-        Delivery: {DELIVERY_METHODS.find((item) => item.id === delivery)?.label ?? delivery}
-      </p>
+      {requiresDeliveryLocation(delivery) && originLocation.trim() ? (
+        <p className="text-slate-600">
+          From {originLocation.trim()} to {destination}
+        </p>
+      ) : null}
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
         {lines.map((item, index) => {
           const label = item.name ?? item.product?.name ?? item.sku ?? `Item ${index + 1}`;

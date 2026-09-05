@@ -25,8 +25,8 @@ export const DELIVERY_METHODS: DeliveryMethod[] = [
   {
     id: "local",
     label: "Local delivery",
-    description: "Same-metro delivery window, typically next business day.",
-    shipping_cents: 1_200,
+    description: "$2 from your current location to the delivery address, typically next business day.",
+    shipping_cents: 200,
   },
   {
     id: "standard",
@@ -36,11 +36,24 @@ export const DELIVERY_METHODS: DeliveryMethod[] = [
   },
   {
     id: "expedited",
-    label: "Expedited",
-    description: "Two-day freight when inventory is available.",
-    shipping_cents: 3_999,
+    label: "Expedited delivery",
+    description: "$3 from your current location to the delivery address, typically two-day freight.",
+    shipping_cents: 300,
   },
 ];
+
+export function requiresDeliveryLocation(methodId: string) {
+  return methodId === "local" || methodId === "expedited";
+}
+
+export function formatAddressLine(parts: {
+  line1?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}) {
+  return [parts.line1, parts.city, parts.state, parts.zip].filter(Boolean).join(", ");
+}
 
 export function resolveCasePrice(
   tiers: PriceTier[],

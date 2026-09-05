@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   calculateCartTotals,
+  requiresDeliveryLocation,
   resolveCasePrice,
   shippingCentsForMethod,
   taxRateForState,
@@ -71,5 +72,33 @@ describe("tax and shipping", () => {
   it("gives free standard shipping over the configured threshold", () => {
     assert.equal(shippingCentsForMethod("standard", 25_000), 0);
     assert.equal(shippingCentsForMethod("standard", 24_999), 1499);
+  });
+
+  it("requires an origin location only for local and expedited delivery", () => {
+    assert.equal(requiresDeliveryLocation("local"), true);
+    assert.equal(requiresDeliveryLocation("expedited"), true);
+    assert.equal(requiresDeliveryLocation("standard"), false);
+    assert.equal(requiresDeliveryLocation("pickup"), false);
+  });
+
+  it("charges $2 for local and $3 for expedited delivery", () => {
+    assert.equal(shippingCentsForMethod("local", 1_000), 200);
+    assert.equal(shippingCentsForMethod("expedited", 1_000), 300);
+    const local = calculateCartTotals({
+      lineSubtotalsCents: [10000],
+      deliveryMethodId: "local",
+      shippingState: "TX",
+      taxExempt: true,
+    });
+    const expedited = calculateCartTotals({
+      lineSubtotalsCents: [10000],
+      deliveryMethodId: "expedited",
+      shippingState: "TX",
+      taxExempt: true,
+    });
+    assert.equal(local.shipping_cents, 200);
+    assert.equal(expedited.shipping_cents, 300);
+    assert.equal(local.total_cents, 10200);
+    assert.equal(expedited.total_cents, 10300);
   });
 });

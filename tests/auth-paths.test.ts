@@ -15,6 +15,7 @@ describe("auth path protection", () => {
       "/api/cart",
       "/api/cart/items/abc",
       "/api/checkout/create-intent",
+      "/api/checkout/reverse-geocode",
       "/api/orders",
       "/api/account/addresses",
       "/api/admin/metrics",

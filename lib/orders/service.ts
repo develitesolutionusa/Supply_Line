@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getCartSnapshot, clearCart } from "@/lib/cart/service";
 import { notifyIfLowStockBreached } from "@/lib/inventory/alerts";
 import { pageBounds } from "@/lib/pagination";
-import { DELIVERY_METHODS, resolveCasePrice } from "@/lib/pricing";
+import { DELIVERY_METHODS, requiresDeliveryLocation, resolveCasePrice } from "@/lib/pricing";
 import { ensureAppUser, ensureBusinessAccount } from "@/lib/supabase/identity";
 import { syncClerkIdentity } from "@/lib/sync/clerk";
 import { assertNoError, createServiceClient } from "@/lib/supabase/server";
@@ -122,9 +122,13 @@ export async function placeOrder(options: {
   taxExempt: boolean;
   deliveryMethodId: string;
   address: Omit<AddressRecord, "id" | "user_id">;
+  originLocation?: string;
 }) {
   if (!DELIVERY_METHODS.some((method) => method.id === options.deliveryMethodId)) {
     throw new Error("Invalid delivery method");
+  }
+  if (requiresDeliveryLocation(options.deliveryMethodId) && !options.originLocation?.trim()) {
+    throw new Error("Current location is required for local and expedited delivery.");
   }
 
   const cart = await getCartSnapshot({
@@ -154,7 +158,9 @@ export async function placeOrder(options: {
     .insert({
       user_id: user.id,
       business_account_id: business?.id ?? null,
-      label: options.address.label,
+      label: options.originLocation?.trim()
+        ? `${options.address.label} · from ${options.originLocation.trim()}`
+        : options.address.label,
       line1: options.address.line1,
       line2: options.address.line2,
       city: options.address.city,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAccountContext } from "@/lib/auth/context";
 import { attachPaymentIntent, placeOrder } from "@/lib/orders/service";
+import { requiresDeliveryLocation } from "@/lib/pricing";
 import { ensureCheckoutStripeCustomer } from "@/lib/stripe/customer";
 import { paymentIntentCreateParams } from "@/lib/stripe/payment-intent";
 import { getStripe, stripeConfigured } from "@/lib/stripe/server";
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     delivery_method?: string;
+    origin_location?: string;
     address?: {
       label?: string;
       line1?: string;
@@ -29,13 +31,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Shipping address is required" }, { status: 400 });
   }
 
+  const deliveryMethod = body.delivery_method ?? "standard";
+  if (requiresDeliveryLocation(deliveryMethod) && !body.origin_location?.trim()) {
+    return NextResponse.json(
+      { error: "Current location is required for local and expedited delivery." },
+      { status: 400 },
+    );
+  }
+
   try {
     const order = await placeOrder({
       userId: account.userId,
       orgId: account.orgId,
       accountTier: account.accountTier,
       taxExempt: account.taxExempt,
-      deliveryMethodId: body.delivery_method ?? "standard",
+      deliveryMethodId: deliveryMethod,
+      originLocation: body.origin_location,
       address: {
         label: body.address.label ?? "Shipping",
         line1: body.address.line1,
