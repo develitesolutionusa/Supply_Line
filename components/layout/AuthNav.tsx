@@ -11,7 +11,7 @@ export function AuthNav() {
     return (
       <Link
         href="/sign-in"
-        className="inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white transition hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="btn-primary inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >
         Sign in
       </Link>
@@ -33,13 +33,13 @@ function ClerkAuthNav() {
       <div className="flex items-center gap-2">
         <Link
           href="/sign-up"
-          className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky sm:inline"
+          className="nav-glow hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky sm:inline"
         >
           Create account
         </Link>
         <Link
           href="/sign-in"
-          className="inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white transition hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="btn-primary inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           Sign in
         </Link>
@@ -92,7 +92,7 @@ function SignedInAccountMenu() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        className="flex max-w-[14rem] items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+        className="nav-glow flex max-w-[14rem] items-center gap-2 rounded-lg px-2 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
         aria-expanded={open}
         aria-controls={menuId}
         aria-haspopup="menu"

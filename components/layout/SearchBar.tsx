@@ -27,7 +27,7 @@ export function SearchBar({ id, className, defaultValue }: SearchBarProps) {
         />
         <button
           type="submit"
-          className="absolute inset-y-1 right-1 rounded-md bg-sky px-3 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="btn-primary absolute inset-y-1 right-1 rounded-md bg-sky px-3 text-xs font-semibold uppercase tracking-wide text-white hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           Search
         </button>

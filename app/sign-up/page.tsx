@@ -18,7 +18,7 @@ export default function SignUpSelectorPage() {
       <div className="mt-10 grid gap-5 md:grid-cols-2">
         <Link
           href="/sign-up/individual"
-          className="rounded-md border border-slate-200 bg-white p-6 transition hover:border-sky hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+          className="surface-card card-interactive p-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-sky-text">Retail</p>
           <h2 className="mt-2 text-xl font-semibold text-navy">Individual</h2>
@@ -31,7 +31,7 @@ export default function SignUpSelectorPage() {
         </Link>
         <Link
           href="/sign-up/business"
-          className="rounded-md border border-slate-200 bg-white p-6 transition hover:border-sky hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+          className="surface-card card-interactive p-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-sky-text">Wholesale</p>
           <h2 className="mt-2 text-xl font-semibold text-navy">Business</h2>

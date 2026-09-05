@@ -7,7 +7,7 @@ import type { ResolvedProduct } from "@/lib/catalog/query";
 
 export function ProductCard({ product }: { product: ResolvedProduct }) {
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
+    <article className="surface-card card-interactive flex h-full flex-col overflow-hidden">
       <Link
         href={`/products/${product.sku}`}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"

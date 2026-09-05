@@ -103,8 +103,8 @@ export function ReorderView() {
             <button
               type="button"
               onClick={() => void selectOrder(order.id)}
-              className={`w-full rounded-md border px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky ${
-                selected === order.id ? "border-sky bg-sky/5" : "border-slate-200 bg-white hover:border-sky"
+              className={`card-interactive w-full rounded-md border px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky ${
+                selected === order.id ? "border-sky bg-sky/5" : "border-slate-200 bg-white"
               }`}
               aria-pressed={selected === order.id}
             >

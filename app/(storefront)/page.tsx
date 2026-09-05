@@ -81,7 +81,7 @@ export default async function HomePage() {
             <li key={category.slug}>
               <Link
                 href={`/catalog?category=${category.slug}`}
-                className="flex flex-col items-center rounded-md border border-slate-200 bg-white px-3 py-5 text-center transition hover:border-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+                className="surface-card card-interactive flex flex-col items-center px-3 py-5 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
               >
                 <span className="relative h-16 w-16 overflow-hidden rounded-full bg-slate-100">
                   <Image

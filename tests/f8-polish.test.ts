@@ -17,5 +17,8 @@ describe("F8 contrast tokens", () => {
     assert.match(css, /--color-sky-text:\s*#1d4ed8/);
     assert.match(css, /prefers-reduced-motion/);
     assert.match(css, /100dvh/);
+    assert.match(css, /\.card-interactive:hover/);
+    assert.match(css, /\.btn-primary:hover/);
+    assert.match(css, /0 0 22px rgb\(37 99 235/);
   });
 });

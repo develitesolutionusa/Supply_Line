@@ -41,7 +41,7 @@ export function AddToCartButton({
         disabled={disabled}
         aria-busy={pending}
         aria-live="polite"
-        className={`inline-flex h-10 items-center justify-center rounded-md bg-navy px-4 text-sm font-semibold text-white transition hover:bg-navy-muted disabled:cursor-not-allowed disabled:bg-slate-300 ${fieldClass.RING} ${className}`}
+        className={`btn-navy inline-flex h-10 items-center justify-center rounded-md bg-navy px-4 text-sm font-semibold text-white hover:bg-navy-muted disabled:cursor-not-allowed disabled:bg-slate-300 ${fieldClass.RING} ${className}`}
       >
         {stockStatus === "out_of_stock" ? "Out of stock" : pending ? "Adding…" : "Add to cart"}
       </button>
