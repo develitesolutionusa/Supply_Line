@@ -24,10 +24,12 @@ export async function getAccountContext(): Promise<AccountContext> {
   const accountTier: AccountTier = isBusiness ? "business" : "individual";
   const activeOrgId = isBusiness ? (orgId ?? null) : null;
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
-  const isAdmin = hasAdminLoginEmail([
+  const emails = [
     email,
     ...(user?.emailAddresses?.map((address) => address.emailAddress) ?? []),
-  ]);
+    ...(user?.externalAccounts?.map((account) => account.emailAddress) ?? []),
+  ];
+  let isAdmin = hasAdminLoginEmail(emails);
 
   let taxExempt = false;
   if (userId && isSupabaseConfigured()) {
@@ -38,6 +40,9 @@ export async function getAccountContext(): Promise<AccountContext> {
       role: isAdmin ? "admin" : undefined,
     });
     taxExempt = isBusiness ? (synced.account?.tax_exempt ?? false) : false;
+    if (!isAdmin && synced.user.role === "admin") {
+      isAdmin = true;
+    }
   }
 
   return {

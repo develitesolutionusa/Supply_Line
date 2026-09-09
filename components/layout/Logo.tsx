@@ -27,7 +27,8 @@ function LogoMark() {
   );
 }
 
-export function Logo() {
+export function Logo({ appearance = "light" }: { appearance?: "light" | "dark" }) {
+  const wordmark = appearance === "dark" ? "site-footer-text" : "site-header-text";
   return (
     <Link
       href="/"
@@ -36,10 +37,10 @@ export function Logo() {
     >
       <LogoMark />
       <span className="leading-none">
-        <span className="site-header-text block text-[17px] font-semibold tracking-[-0.03em]">
+        <span className={`${wordmark} block text-[17px] font-semibold tracking-[-0.03em]`}>
           Supply<span className="font-medium">Line</span>
         </span>
-        <span className="site-header-text mt-1 block text-[9px] font-semibold uppercase tracking-[0.28em]">
+        <span className={`${wordmark} mt-1 block text-[9px] font-semibold uppercase tracking-[0.28em]`}>
           {SITE_TAGLINE}
         </span>
       </span>

@@ -1,3 +1,4 @@
+import { COMPANY } from "@/lib/company";
 import { SITE_NAME } from "@/lib/nav";
 
 export const SITE_DESCRIPTION =
@@ -14,5 +15,6 @@ export function organizationJsonLd() {
     name: SITE_NAME,
     url: siteUrl(),
     description: SITE_DESCRIPTION,
+    sameAs: COMPANY.social.map((item) => item.href),
   };
 }

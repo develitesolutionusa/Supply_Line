@@ -9,6 +9,8 @@ export const NAV_LINKS = [
   { href: "/contact", label: "Contact us" },
 ] as const;
 
+export const ADMIN_NAV_LINK = { href: "/admin", label: "Admin" } as const;
+
 export const FOOTER_SHOP_LINKS = [
   { href: "/catalog", label: "Catalog" },
   { href: "/quick-order", label: "Quick order" },

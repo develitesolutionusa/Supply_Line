@@ -316,7 +316,7 @@ Tables to create (in dependency order):
 - [x] Order management: `GET /api/admin/orders` (all orders, filterable by status), `PATCH .../status`
 - [x] Business account management: `GET /api/admin/business-accounts`, `PATCH .../tax-exempt`
 - [x] Every admin route double-checks `role = admin` server-side (never trust RLS alone for admin-sensitive aggregate reads that might bypass row-level scoping)
-- [x] Email integration (Resend): order confirmation on `payment_intent.succeeded`, low-stock alert to `ADMIN_ALERT_EMAIL` on threshold breach
+- [x] Email integration (Resend): order confirmation on `payment_intent.succeeded`, low-stock alert to the first `ADMIN_EMAILS` address on threshold breach
 
 **Done when:** Frontend Phase F7 runs entirely on real data with no mock arrays remaining.
 

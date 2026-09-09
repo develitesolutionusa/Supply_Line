@@ -4,7 +4,6 @@ import { OrganizationSwitcher, SignOutButton, useAuth, useOrganization, useUser 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { isBusinessAccountType } from "@/lib/auth/accountType";
-import { hasAdminLoginEmail } from "@/lib/auth/admin";
 
 type AuthNavProps = {
   appearance?: "toolbar" | "menu";
@@ -105,16 +104,11 @@ function SignedInAccountMenu() {
     };
   }, [open]);
 
-  const displayName =
-    user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress || "Account";
+  const displayName = user?.fullName || user?.firstName || "Account";
   const isBusiness = isBusinessAccountType(user?.unsafeMetadata?.accountType, {
     hasOrganization: Boolean(organization) || (user?.organizationMemberships?.length ?? 0) > 0,
   });
   const orgName = isBusiness ? organization?.name : undefined;
-  const isAdmin = hasAdminLoginEmail([
-    user?.primaryEmailAddress?.emailAddress,
-    ...(user?.emailAddresses?.map((address) => address.emailAddress) ?? []),
-  ]);
 
   return (
     <div ref={rootRef} className="relative">
@@ -146,9 +140,6 @@ function SignedInAccountMenu() {
         >
           <div className="border-b border-slate-100 px-3 pb-3">
             <p className="truncate text-sm font-semibold">{displayName}</p>
-            <p className="truncate text-xs text-slate-500">
-              {user?.primaryEmailAddress?.emailAddress}
-            </p>
             {isBusiness ? (
               <div className="mt-3">
                 <OrganizationSwitcher
@@ -184,16 +175,6 @@ function SignedInAccountMenu() {
           >
             Account
           </Link>
-          {isAdmin ? (
-            <Link
-              href="/admin"
-              role="menuitem"
-              className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
-              onClick={() => setOpen(false)}
-            >
-              Admin
-            </Link>
-          ) : null}
           {isBusiness && !organization ? (
             <Link
               href="/create-organization"

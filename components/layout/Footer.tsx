@@ -1,66 +1,69 @@
 import Link from "next/link";
+import { Logo } from "@/components/layout/Logo";
+import { SocialIcons } from "@/components/layout/SocialIcons";
+import { COMPANY, companyAddressLine } from "@/lib/company";
 import { FOOTER_ACCOUNT_LINKS, FOOTER_COMPANY_LINKS, FOOTER_SHOP_LINKS, SITE_NAME } from "@/lib/nav";
+
+function FooterLinks({
+  title,
+  links,
+}: {
+  title: string;
+  links: readonly { href: string; label: string }[];
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-on-navy">{title}</p>
+      <ul className="mt-4 space-y-2.5">
+        {links.map((link) => (
+          <li key={link.href}>
+            <Link href={link.href} className="site-footer-link">
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
+    <footer className="site-footer mt-auto">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
-          <p className="text-lg font-semibold text-navy">{SITE_NAME}</p>
-          <p className="mt-2 max-w-xs text-sm leading-6 text-muted">
+          <Logo appearance="dark" />
+          <p className="mt-4 max-w-xs text-sm leading-6 text-slate-300">
             Case-priced foodservice disposables for restaurants, caterers, and purchasing managers.
           </p>
+          <address className="mt-5 not-italic text-sm leading-6 text-slate-300">
+            <p className="font-semibold text-white">{COMPANY.warehouse.label}</p>
+            <p>{companyAddressLine()}</p>
+            <p className="mt-2">{COMPANY.hours}</p>
+            <p className="mt-2">
+              <a className="site-footer-link" href="tel:+12145550140">
+                {COMPANY.phone}
+              </a>
+            </p>
+            <p>
+              <a className="site-footer-link" href={`mailto:${COMPANY.email}`}>
+                {COMPANY.email}
+              </a>
+            </p>
+          </address>
+          <SocialIcons className="mt-5" />
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Shop</p>
-          <ul className="mt-3 space-y-2">
-            {FOOTER_SHOP_LINKS.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="text-sm text-navy hover:text-sky-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Company</p>
-          <ul className="mt-3 space-y-2">
-            {FOOTER_COMPANY_LINKS.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="text-sm text-navy hover:text-sky-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Account</p>
-          <ul className="mt-3 space-y-2">
-            {FOOTER_ACCOUNT_LINKS.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="text-sm text-navy hover:text-sky-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <FooterLinks title="Shop" links={FOOTER_SHOP_LINKS} />
+        <FooterLinks title="Company" links={FOOTER_COMPANY_LINKS} />
+        <FooterLinks title="Account" links={FOOTER_ACCOUNT_LINKS} />
       </div>
-      <div className="border-t border-slate-200">
-        <p className="mx-auto max-w-7xl px-4 py-4 text-xs text-slate-500 sm:px-6 lg:px-8">
-          © {new Date().getFullYear()} {SITE_NAME}.
-        </p>
+      <div className="border-t border-white/10">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <p>
+            © {new Date().getFullYear()} {SITE_NAME}. Wholesale desk in Dallas, TX.
+          </p>
+          <SocialIcons />
+        </div>
       </div>
     </footer>
   );

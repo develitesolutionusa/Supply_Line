@@ -1,4 +1,4 @@
-const DEFAULT_ADMIN_EMAILS = ["husbantech08@gmail.com"];
+const DEFAULT_ADMIN_EMAILS: string[] = [];
 
 function parseEmailList(value: string | undefined) {
   return (value ?? "")
@@ -14,6 +14,10 @@ export function adminEmailAllowlist() {
   ];
   const unique = [...new Set(fromEnv)];
   return unique.length > 0 ? unique : DEFAULT_ADMIN_EMAILS;
+}
+
+export function adminNoticeEmail() {
+  return adminEmailAllowlist()[0] ?? "";
 }
 
 export function isAdminLoginEmail(

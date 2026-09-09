@@ -11,6 +11,12 @@ export const COMPANY = {
     state: "TX",
     zip: "75201",
   },
+  social: [
+    { name: "LinkedIn", href: "https://www.linkedin.com/company/supplyline" },
+    { name: "Instagram", href: "https://www.instagram.com/supplyline" },
+    { name: "Facebook", href: "https://www.facebook.com/supplyline" },
+    { name: "X", href: "https://x.com/supplyline" },
+  ],
 } as const;
 
 export function companyAddressLine() {

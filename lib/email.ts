@@ -1,3 +1,4 @@
+import { adminNoticeEmail } from "@/lib/auth/admin";
 import { formatCents } from "@/lib/pricing";
 import type { OrderRecord } from "@/types/commerce";
 
@@ -67,9 +68,9 @@ export async function sendOrderConfirmation(order: OrderRecord, email: string | 
 }
 
 export async function sendLowStockAlert(sku: string, quantity: number, name?: string) {
-  const to = process.env.ADMIN_ALERT_EMAIL;
+  const to = adminNoticeEmail();
   if (!to) {
-    console.info("[email] low-stock alert skipped (no ADMIN_ALERT_EMAIL)", { sku, quantity });
+    console.info("[email] low-stock alert skipped (no ADMIN_EMAILS)", { sku, quantity });
     return;
   }
 
@@ -107,9 +108,9 @@ export async function sendContactInquiry(input: {
   topic: string;
   message: string;
 }) {
-  const to = process.env.ADMIN_ALERT_EMAIL;
+  const to = adminNoticeEmail();
   if (!to) {
-    console.info("[email] contact inquiry skipped (no ADMIN_ALERT_EMAIL)");
+    console.info("[email] contact inquiry skipped (no ADMIN_EMAILS)");
     return { delivered: false as const };
   }
 

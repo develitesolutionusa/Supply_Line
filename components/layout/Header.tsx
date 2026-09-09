@@ -3,17 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
-import { NAV_LINKS } from "@/lib/nav";
+import { ADMIN_NAV_LINK, NAV_LINKS } from "@/lib/nav";
 import { AuthNav } from "@/components/layout/AuthNav";
 import { CartButton } from "@/components/layout/CartButton";
 import { HeaderSearch } from "@/components/layout/HeaderSearch";
 import { Logo } from "@/components/layout/Logo";
 
-export function Header() {
+export function Header({ showAdmin = false }: { showAdmin?: boolean }) {
   const pathname = usePathname();
+  const panelId = useId();
   const [open, setOpen] = useState(false);
   const [menuForPath, setMenuForPath] = useState(pathname);
-  const panelId = useId();
+  const links = showAdmin ? [...NAV_LINKS, ADMIN_NAV_LINK] : [...NAV_LINKS];
 
   if (menuForPath !== pathname) {
     setMenuForPath(pathname);
@@ -28,6 +29,8 @@ export function Header() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
+
+  if (pathname.startsWith("/sign-in")) return null;
 
   return (
     <header className="site-header sticky top-0 z-40 text-navy">
@@ -55,7 +58,7 @@ export function Header() {
         </div>
 
         <nav className="hidden items-center lg:flex" aria-label="Primary">
-          {NAV_LINKS.map((link) => {
+          {links.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
@@ -81,7 +84,7 @@ export function Header() {
         <div id={panelId} className="border-t border-slate-200/80 bg-white lg:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6">
             <nav className="flex flex-col gap-1" aria-label="Mobile">
-              {NAV_LINKS.map((link) => {
+              {links.map((link) => {
                 const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
                 return (
                   <Link

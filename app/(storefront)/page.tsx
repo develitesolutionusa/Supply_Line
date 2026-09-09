@@ -29,9 +29,9 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <section className="border-b border-slate-200 bg-slate-100">
+      <section className="hero-section border-b border-slate-200 bg-slate-100">
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-16">
-          <div>
+          <div className="hero-copy">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-text">
               Foodservice disposables
             </p>

@@ -8,10 +8,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   if (!account.isAdmin) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-16 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center px-4 text-center">
         <h1 className="text-2xl font-semibold text-navy">Admin access required</h1>
-        <p className="mt-3 text-sm text-slate-600">
-          This area is only available when you sign in with the designated admin email.
+        <p className="mt-3 max-w-md text-sm text-slate-600">
+          This area is only available to authorized operators.
         </p>
       </div>
     );
