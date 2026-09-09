@@ -1,5 +1,6 @@
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Header } from "@/components/layout/Header";
+import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <main id="main-content" className="flex-1" tabIndex={-1}>
         {children}
       </main>
+      <ScrollReveal />
       <SiteFooter />
     </div>
   );

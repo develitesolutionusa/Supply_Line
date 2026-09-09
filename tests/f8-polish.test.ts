@@ -20,5 +20,7 @@ describe("F8 contrast tokens", () => {
     assert.match(css, /\.card-interactive:hover/);
     assert.match(css, /\.btn-primary:hover/);
     assert.match(css, /0 0 22px rgb\(37 99 235/);
+    assert.match(css, /\.scroll-reveal/);
+    assert.match(css, /\.scroll-reveal\.is-inview/);
   });
 });
