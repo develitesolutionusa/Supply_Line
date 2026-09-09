@@ -6,18 +6,14 @@ import { useEffect, useId, useState } from "react";
 import { NAV_LINKS } from "@/lib/nav";
 import { AuthNav } from "@/components/layout/AuthNav";
 import { CartButton } from "@/components/layout/CartButton";
+import { HeaderSearch } from "@/components/layout/HeaderSearch";
 import { Logo } from "@/components/layout/Logo";
-import { SearchBar } from "@/components/layout/SearchBar";
 
 export function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [menuForPath, setMenuForPath] = useState(pathname);
   const panelId = useId();
-  const isAuthRoute =
-    pathname.startsWith("/sign-in") ||
-    pathname.startsWith("/sign-up") ||
-    pathname.startsWith("/create-organization");
 
   if (menuForPath !== pathname) {
     setMenuForPath(pathname);
@@ -34,83 +30,74 @@ export function Header() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-40 bg-navy text-white shadow-sm">
-      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:gap-4 lg:px-8">
-        <button
-          type="button"
-          className="nav-glow inline-flex h-10 w-10 items-center justify-center rounded-md text-slate-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky lg:hidden"
-          aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-            </svg>
-          )}
-        </button>
-        <Logo />
+    <header className="site-header sticky top-0 z-40 text-navy">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:h-[4.25rem] lg:gap-5 lg:px-8">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            className="site-header-control inline-flex h-9 w-9 items-center justify-center rounded-md text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky lg:hidden"
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? (
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+          <Logo />
+        </div>
 
-        {isAuthRoute ? null : (
-          <SearchBar id="site-search" className="hidden min-w-0 flex-1 md:block" />
-        )}
-
-        <nav className="ml-auto hidden items-center gap-1 lg:flex" aria-label="Primary">
+        <nav className="hidden items-center lg:flex" aria-label="Primary">
           {NAV_LINKS.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`nav-glow rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky ${
-                  active ? "bg-white/10 text-white" : "text-slate-300 hover:text-white"
-                }`}
+                aria-current={active ? "page" : undefined}
+                className="site-header-link inline-flex h-9 items-center px-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
               >
-                {link.label}
+                <span className="site-header-text">{link.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1 lg:ml-2">
-          <AuthNav />
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <HeaderSearch />
+          <AuthNav appearance="toolbar" />
           <CartButton />
         </div>
       </div>
 
-      {isAuthRoute ? null : (
-        <div className="border-t border-white/10 px-4 py-3 md:hidden">
-          <SearchBar id="site-search-mobile" />
-        </div>
-      )}
-
       {open ? (
-        <div
-          id={panelId}
-          className="border-t border-white/10 bg-navy-muted px-4 py-4 lg:hidden"
-        >
-          <nav className="flex flex-col gap-1" aria-label="Mobile">
-            {NAV_LINKS.map((link) => {
-              const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`nav-glow rounded-md px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky ${
-                    active ? "bg-white/10 text-white" : "text-slate-200"
-                  }`}
-                  onClick={() => setOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
+        <div id={panelId} className="border-t border-slate-200/80 bg-white lg:hidden">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6">
+            <nav className="flex flex-col gap-1" aria-label="Mobile">
+              {NAV_LINKS.map((link) => {
+                const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className="site-header-link rounded-md px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="site-header-text">{link.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+            <AuthNav appearance="menu" onNavigate={() => setOpen(false)} />
+          </div>
         </div>
       ) : null}
     </header>

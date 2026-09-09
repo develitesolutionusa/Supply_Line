@@ -5,6 +5,8 @@ export const NAV_LINKS = [
   { href: "/catalog", label: "Catalog" },
   { href: "/quick-order", label: "Quick order" },
   { href: "/reorder", label: "Reorder" },
+  { href: "/about", label: "About us" },
+  { href: "/contact", label: "Contact us" },
 ] as const;
 
 export const FOOTER_SHOP_LINKS = [
@@ -12,6 +14,11 @@ export const FOOTER_SHOP_LINKS = [
   { href: "/quick-order", label: "Quick order" },
   { href: "/reorder", label: "Reorder" },
   { href: "/cart", label: "Cart" },
+] as const;
+
+export const FOOTER_COMPANY_LINKS = [
+  { href: "/about", label: "About us" },
+  { href: "/contact", label: "Contact us" },
 ] as const;
 
 export const FOOTER_ACCOUNT_LINKS = [

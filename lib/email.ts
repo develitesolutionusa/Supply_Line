@@ -89,3 +89,43 @@ export async function sendLowStockAlert(sku: string, quantity: number, name?: st
     console.error("[email] low-stock alert failed", error);
   }
 }
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+export async function sendContactInquiry(input: {
+  name: string;
+  email: string;
+  company: string;
+  phone: string;
+  topic: string;
+  message: string;
+}) {
+  const to = process.env.ADMIN_ALERT_EMAIL;
+  if (!to) {
+    console.info("[email] contact inquiry skipped (no ADMIN_ALERT_EMAIL)");
+    return { delivered: false as const };
+  }
+
+  await sendResendEmail({
+    to,
+    subject: `Website inquiry · ${input.topic}`,
+    html: `
+      <p>A buyer sent a message from the SupplyLine contact page.</p>
+      <p><strong>Name:</strong> ${escapeHtml(input.name)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(input.email)}</p>
+      <p><strong>Company:</strong> ${escapeHtml(input.company || "—")}</p>
+      <p><strong>Phone:</strong> ${escapeHtml(input.phone || "—")}</p>
+      <p><strong>Topic:</strong> ${escapeHtml(input.topic)}</p>
+      <p>${escapeHtml(input.message).replaceAll("\n", "<br />")}</p>
+    `,
+  });
+  console.info("[email] contact inquiry sent", { topic: input.topic, to });
+  return { delivered: true as const };
+}

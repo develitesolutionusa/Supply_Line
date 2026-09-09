@@ -35,21 +35,21 @@ export function CartButton() {
   return (
     <Link
       href="/cart"
-      className="nav-glow relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+      className="site-header-control relative inline-flex h-9 w-9 items-center justify-center rounded-md text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
       aria-label={label}
     >
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
         <path
           d="M6 6h15l-1.5 9h-12L5 3H2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <circle cx="9" cy="20" r="1.3" fill="currentColor" stroke="none" />
-        <circle cx="18" cy="20" r="1.3" fill="currentColor" stroke="none" />
+        <circle cx="9" cy="20" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="18" cy="20" r="1.2" fill="currentColor" stroke="none" />
       </svg>
       {count > 0 ? (
-        <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-sky px-1 text-[10px] font-bold text-white">
-          {count}
+        <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky px-1 text-[10px] font-semibold leading-none text-white">
+          {count > 99 ? "99+" : count}
         </span>
       ) : null}
     </Link>

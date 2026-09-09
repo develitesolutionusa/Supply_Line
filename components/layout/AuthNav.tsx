@@ -6,47 +6,75 @@ import { useEffect, useId, useRef, useState } from "react";
 import { isBusinessAccountType } from "@/lib/auth/accountType";
 import { hasAdminLoginEmail } from "@/lib/auth/admin";
 
-export function AuthNav() {
+type AuthNavProps = {
+  appearance?: "toolbar" | "menu";
+  onNavigate?: () => void;
+};
+
+export function AuthNav({ appearance = "toolbar", onNavigate }: AuthNavProps) {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    return (
-      <Link
-        href="/sign-in"
-        className="btn-primary inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-      >
-        Sign in
-      </Link>
-    );
+    return <FallbackAuth appearance={appearance} onNavigate={onNavigate} />;
   }
 
-  return <ClerkAuthNav />;
+  return <ClerkAuthNav appearance={appearance} onNavigate={onNavigate} />;
 }
 
-function ClerkAuthNav() {
-  const { isLoaded, isSignedIn } = useAuth();
+function GetStartedLink({
+  appearance,
+  onNavigate,
+}: {
+  appearance: "toolbar" | "menu";
+  onNavigate?: () => void;
+}) {
+  const isMenu = appearance === "menu";
+  return (
+    <Link
+      href="/sign-up"
+      className={
+        isMenu
+          ? "site-header-signin inline-flex h-10 w-full items-center justify-center rounded-md bg-sky px-4 text-sm font-semibold text-white hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+          : "site-header-signin inline-flex h-9 items-center rounded-md bg-sky px-3.5 text-[13px] font-semibold text-white hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky max-sm:hidden"
+      }
+      onClick={onNavigate}
+    >
+      Get Started
+    </Link>
+  );
+}
 
-  if (!isLoaded) {
-    return <div className="h-10 w-24 animate-pulse rounded-lg bg-white/10" aria-hidden />;
-  }
-
-  if (!isSignedIn) {
+function FallbackAuth({ appearance, onNavigate }: AuthNavProps) {
+  if (appearance === "menu") {
     return (
-      <div className="flex items-center gap-2">
-        <Link
-          href="/sign-up"
-          className="nav-glow hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky sm:inline"
-        >
-          Create account
-        </Link>
-        <Link
-          href="/sign-in"
-          className="btn-primary inline-flex h-10 items-center rounded-md bg-sky px-3 text-sm font-semibold text-white hover:bg-sky-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-        >
-          Sign in
-        </Link>
+      <div className="border-t border-slate-200 pt-3 sm:hidden">
+        <GetStartedLink appearance="menu" onNavigate={onNavigate} />
       </div>
     );
   }
 
+  return <GetStartedLink appearance="toolbar" />;
+}
+
+function ClerkAuthNav({ appearance, onNavigate }: AuthNavProps) {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    if (appearance === "menu") return null;
+    return <div className="h-9 w-20 animate-pulse rounded-md bg-slate-200/80 max-sm:hidden" aria-hidden />;
+  }
+
+  if (!isSignedIn) {
+    if (appearance === "menu") {
+      return (
+        <div className="border-t border-slate-200 pt-3 sm:hidden">
+          <GetStartedLink appearance="menu" onNavigate={onNavigate} />
+        </div>
+      );
+    }
+
+    return <GetStartedLink appearance="toolbar" />;
+  }
+
+  if (appearance === "menu") return null;
   return <SignedInAccountMenu />;
 }
 
@@ -92,19 +120,19 @@ function SignedInAccountMenu() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        className="nav-glow flex max-w-[14rem] items-center gap-2 rounded-lg px-2 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+        className="site-header-control flex h-9 max-w-[13rem] items-center gap-2 rounded-md px-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
         aria-expanded={open}
         aria-controls={menuId}
         aria-haspopup="menu"
         aria-label={`Account menu for ${displayName}`}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky text-xs font-semibold text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky text-[11px] font-semibold text-white">
           {displayName.slice(0, 1).toUpperCase()}
         </span>
         <span className="hidden min-w-0 sm:block">
-          <span className="block truncate text-sm font-medium text-white">{displayName}</span>
-          <span className="block truncate text-[11px] text-slate-300">
+          <span className="site-header-text block truncate text-[13px] font-medium">{displayName}</span>
+          <span className="block truncate text-[11px] text-slate-500">
             {orgName ?? (isBusiness ? "No company yet" : "Individual")}
           </span>
         </span>

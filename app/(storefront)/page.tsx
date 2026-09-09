@@ -44,10 +44,10 @@ export default async function HomePage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/catalog" className={fieldClass.BUTTON}>
-                Shop wholesale
+                Browse catalog
               </Link>
-              <Link href="/catalog" className={fieldClass.GHOST}>
-                Shop retail
+              <Link href="/quick-order" className="btn-foam focus-visible:ring-2 focus-visible:ring-sky">
+                Quick order
               </Link>
             </div>
           </div>
@@ -56,11 +56,17 @@ export default async function HomePage() {
       </section>
 
       <section className="border-b border-slate-200 bg-white">
-        <ul className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
+        <ul className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
           {VALUE_PROPS.map((item) => (
-            <li key={item.title}>
-              <p className="text-sm font-semibold text-navy">{item.title}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">{item.body}</p>
+            <li key={item.title} className="flex justify-center">
+              <article
+                tabIndex={0}
+                className="value-orb"
+                aria-label={`${item.title}: ${item.body}`}
+              >
+                <p className="text-[13px] font-semibold leading-snug text-navy">{item.title}</p>
+                <p className="mt-1.5 text-[11px] leading-4 text-slate-600">{item.body}</p>
+              </article>
             </li>
           ))}
         </ul>
@@ -72,7 +78,7 @@ export default async function HomePage() {
             <h2 className="text-2xl font-semibold text-navy">Shop by category</h2>
             <p className="mt-1 text-sm text-slate-600">Kitchen staples for restaurants, catering, and takeout.</p>
           </div>
-          <Link href="/catalog" className="hidden text-sm font-semibold text-sky-text hover:underline sm:inline">
+          <Link href="/catalog" className="btn-foam focus-visible:ring-2 focus-visible:ring-sky">
             View all
           </Link>
         </div>
@@ -103,7 +109,7 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between gap-4">
             <h2 className="text-2xl font-semibold text-navy">Best sellers</h2>
-            <Link href="/catalog" className="text-sm font-semibold text-sky-text hover:underline">
+            <Link href="/catalog" className="btn-foam focus-visible:ring-2 focus-visible:ring-sky">
               Browse catalog
             </Link>
           </div>

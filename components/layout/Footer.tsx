@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { FOOTER_ACCOUNT_LINKS, FOOTER_SHOP_LINKS, SITE_NAME } from "@/lib/nav";
+import { FOOTER_ACCOUNT_LINKS, FOOTER_COMPANY_LINKS, FOOTER_SHOP_LINKS, SITE_NAME } from "@/lib/nav";
 
 export function Footer() {
   return (
     <footer className="mt-auto border-t border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-3 lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
         <div>
           <p className="text-lg font-semibold text-navy">{SITE_NAME}</p>
           <p className="mt-2 max-w-xs text-sm leading-6 text-muted">
@@ -15,6 +15,21 @@ export function Footer() {
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Shop</p>
           <ul className="mt-3 space-y-2">
             {FOOTER_SHOP_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="text-sm text-navy hover:text-sky-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Company</p>
+          <ul className="mt-3 space-y-2">
+            {FOOTER_COMPANY_LINKS.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}

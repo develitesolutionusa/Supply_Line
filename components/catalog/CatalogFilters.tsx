@@ -2,7 +2,53 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { fieldClass } from "@/lib/ui";
+
+function catalogHref(options: {
+  slug?: string;
+  search?: string;
+  inStock?: boolean;
+  sort?: "name" | "price";
+}) {
+  const params = new URLSearchParams();
+  if (options.slug) params.set("category", options.slug);
+  if (options.search) params.set("q", options.search);
+  if (options.inStock) params.set("stock", "in");
+  if (options.sort === "price") params.set("sort", "price");
+  const query = params.toString();
+  return query ? `/catalog?${query}` : "/catalog";
+}
+
+function FilterSelect({
+  id,
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <label htmlFor={id} className={fieldClass.LABEL}>
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`${fieldClass.INPUT} appearance-auto`}
+      >
+        {children}
+      </select>
+    </div>
+  );
+}
 
 export function CatalogSearch({ defaultValue }: { defaultValue: string }) {
   const router = useRouter();
@@ -26,80 +72,102 @@ export function CatalogSearch({ defaultValue }: { defaultValue: string }) {
   }, [value, defaultValue, router]);
 
   return (
-    <div>
-      <label htmlFor="catalog-search" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Search name or SKU
+    <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+      <label htmlFor="catalog-search" className={fieldClass.LABEL}>
+        Search
       </label>
       <input
         id="catalog-search"
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="ALU-FOIL-18"
-        className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-navy placeholder:text-slate-400 focus:border-sky focus:outline-none focus:ring-2 focus:ring-sky/30"
+        placeholder="Name or SKU"
+        className={fieldClass.INPUT}
       />
     </div>
   );
 }
 
-export function CategorySidebar({
+export function CatalogFilters({
   categories,
   activeSlug,
   search,
   inStock,
+  sortBy,
 }: {
   categories: { slug: string; name: string }[];
   activeSlug?: string;
   search?: string;
   inStock?: boolean;
+  sortBy: "name" | "price";
 }) {
   const router = useRouter();
+  const hasFilters = Boolean(activeSlug || search || inStock || sortBy === "price");
 
-  function hrefFor(slug?: string, stock?: boolean) {
-    const params = new URLSearchParams();
-    if (slug) params.set("category", slug);
-    if (search) params.set("q", search);
-    if (stock) params.set("stock", "in");
-    const query = params.toString();
-    return query ? `/catalog?${query}` : "/catalog";
+  function apply(next: {
+    slug?: string;
+    inStock?: boolean;
+    sort?: "name" | "price";
+  }) {
+    router.push(
+      catalogHref({
+        slug: next.slug,
+        search,
+        inStock: next.inStock,
+        sort: next.sort,
+      }),
+    );
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
-      <CatalogSearch defaultValue={search ?? ""} />
-      <label className="mt-4 flex items-center gap-2 text-sm text-navy">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-slate-300 text-sky focus:ring-sky"
-          checked={Boolean(inStock)}
-          onChange={() => {
-            router.push(hrefFor(activeSlug, !inStock));
-          }}
-        />
-        In stock only
-      </label>
-      <nav aria-label="Categories" className="mt-5 space-y-0.5">
-        <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Categories</p>
-        <Link
-          href={hrefFor(undefined, inStock)}
-          className={`block rounded-md px-3 py-2 text-sm ${
-            !activeSlug ? "bg-sky text-white" : "text-navy hover:bg-slate-50"
-          }`}
+    <div className="mt-5 rounded-md border border-slate-200 bg-white p-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <CatalogSearch defaultValue={search ?? ""} />
+
+        <FilterSelect
+          id="catalog-category"
+          label="Categories"
+          value={activeSlug ?? ""}
+          onChange={(value) => apply({ slug: value || undefined, inStock, sort: sortBy })}
         >
-          All products
-        </Link>
-        {categories.map((category) => (
-          <Link
-            key={category.slug}
-            href={hrefFor(category.slug, inStock)}
-            className={`block rounded-md px-3 py-2 text-sm ${
-              activeSlug === category.slug ? "bg-sky text-white" : "text-navy hover:bg-slate-50"
-            }`}
-          >
-            {category.name}
+          <option value="">All products</option>
+          {categories.map((category) => (
+            <option key={category.slug} value={category.slug}>
+              {category.name}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect
+          id="catalog-stock"
+          label="Availability"
+          value={inStock ? "in" : "all"}
+          onChange={(value) => apply({ slug: activeSlug, inStock: value === "in", sort: sortBy })}
+        >
+          <option value="all">All products</option>
+          <option value="in">In stock only</option>
+        </FilterSelect>
+
+        <FilterSelect
+          id="catalog-sort"
+          label="Sort"
+          value={sortBy}
+          onChange={(value) =>
+            apply({ slug: activeSlug, inStock, sort: value === "price" ? "price" : "name" })
+          }
+        >
+          <option value="name">Name</option>
+          <option value="price">Price</option>
+        </FilterSelect>
+      </div>
+
+      {hasFilters ? (
+        <p className="mt-3 text-sm">
+          <Link href="/catalog" className="font-semibold text-sky-text hover:underline">
+            Clear filters
           </Link>
-        ))}
-      </nav>
+        </p>
+      ) : null}
     </div>
   );
 }
