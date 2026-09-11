@@ -4,7 +4,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { DELIVERY_METHODS, formatCents } from "@/lib/pricing";
 import { fieldClass } from "@/lib/ui";
 import {
-  DEFAULT_COUNTRY,
   DEFAULT_COUNTRY_CODE,
   composeLocation,
   emptyRegion,
@@ -19,15 +18,13 @@ type PlacesPayload = {
   places?: PlaceSuggestion[];
   location?: string;
   region?: RegionContext;
+  error?: string;
 };
 
 async function fetchPlaces(
   params: {
     q?: string;
-    country?: string;
     countryCode?: string;
-    state?: string;
-    city?: string;
     lat?: number;
     lon?: number;
   },
@@ -35,15 +32,15 @@ async function fetchPlaces(
 ) {
   const search = new URLSearchParams();
   if (params.q) search.set("q", params.q);
-  if (params.country) search.set("country", params.country);
   if (params.countryCode) search.set("countryCode", params.countryCode);
-  if (params.state) search.set("state", params.state);
-  if (params.city) search.set("city", params.city);
   if (params.lat != null) search.set("lat", String(params.lat));
   if (params.lon != null) search.set("lon", String(params.lon));
   const response = await fetch(`/api/checkout/places?${search.toString()}`, { cache: "no-store", signal });
-  if (!response.ok) return { places: [] as PlaceSuggestion[] };
-  return (await response.json()) as PlacesPayload;
+  const payload = (await response.json()) as PlacesPayload;
+  if (!response.ok) {
+    return { places: [] as PlaceSuggestion[], error: payload.error || "Could not search nearby locations" };
+  }
+  return payload;
 }
 
 export function DeliveryOriginField({
@@ -71,6 +68,21 @@ export function DeliveryOriginField({
   const [searching, setSearching] = useState(false);
   const [locating, setLocating] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [mapsError, setMapsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation || !navigator.permissions?.query) return;
+    void navigator.permissions.query({ name: "geolocation" }).then((status) => {
+      if (status.state !== "granted") return;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCoords({ lat: position.coords.latitude, lon: position.coords.longitude });
+        },
+        () => undefined,
+        { maximumAge: 60_000, timeout: 4_000 },
+      );
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -84,6 +96,10 @@ export function DeliveryOriginField({
   useEffect(() => {
     if (!open && !liveSearch) return;
     const query = liveSearch ? originLocation.trim() : "";
+    if (query.length < 2 && !coords) {
+      setPlaces([]);
+      return;
+    }
     const controller = new AbortController();
     const handle = window.setTimeout(() => {
       void (async () => {
@@ -92,10 +108,7 @@ export function DeliveryOriginField({
           const payload = await fetchPlaces(
             {
               q: query.length >= 2 ? query : undefined,
-              country: region.country || DEFAULT_COUNTRY,
               countryCode: region.countryCode || DEFAULT_COUNTRY_CODE,
-              state: region.state,
-              city: region.city,
               lat: coords?.lat,
               lon: coords?.lon,
             },
@@ -103,6 +116,7 @@ export function DeliveryOriginField({
           );
           setPlaces(payload.places ?? []);
           setActiveIndex(0);
+          setMapsError(payload.error ?? null);
         } catch (error) {
           if (error instanceof DOMException && error.name === "AbortError") return;
         } finally {
@@ -114,7 +128,7 @@ export function DeliveryOriginField({
       controller.abort();
       window.clearTimeout(handle);
     };
-  }, [open, originLocation, liveSearch, region.country, region.countryCode, region.state, region.city, coords]);
+  }, [open, originLocation, liveSearch, region.countryCode, coords]);
 
   function applyRegion(place: PlaceSuggestion) {
     setRegion((current) => {
@@ -159,9 +173,15 @@ export function DeliveryOriginField({
       setCoords(next);
       setLiveSearch(false);
       const payload = await fetchPlaces(next);
+      if (payload.error) {
+        setMapsError(payload.error);
+        onError(payload.error);
+      }
       const nextRegion = payload.region ?? emptyRegion();
       setRegion(nextRegion);
-      onChange(payload.location?.trim() || composeLocation(nextRegion) || `${next.lat.toFixed(5)}, ${next.lon.toFixed(5)}`);
+      onChange(
+        payload.location?.trim() || composeLocation(nextRegion) || `${next.lat.toFixed(5)}, ${next.lon.toFixed(5)}`,
+      );
       setPlaces(payload.places ?? []);
       setActiveIndex(0);
       setOpen((payload.places?.length ?? 0) > 0);
@@ -182,7 +202,7 @@ export function DeliveryOriginField({
           id="checkout-origin"
           className={fieldClass.INPUT}
           value={originLocation}
-          placeholder="Search country, state, city, or street"
+          placeholder="Search a street, city, or state near you"
           autoComplete="off"
           role="combobox"
           aria-autocomplete="list"
@@ -229,14 +249,14 @@ export function DeliveryOriginField({
           }}
         />
         <p className="mt-1 text-xs text-slate-500">
-          One search for {region.country || DEFAULT_COUNTRY}: states, cities, and streets appear together.
+          Results stay near your current location{region.country ? ` in ${region.country}` : ""}.
         </p>
         {open && places.length > 0 ? (
           <ul
             id={listId}
             className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg"
             role="listbox"
-            aria-label="Locations"
+            aria-label="Nearby locations"
           >
             {places.map((place, index) => (
               <li key={`${place.kind ?? "place"}:${place.id}`}>
@@ -259,11 +279,13 @@ export function DeliveryOriginField({
           </ul>
         ) : null}
         {open && liveSearch && originLocation.trim().length >= 2 && !searching && places.length === 0 ? (
-          <p className="mt-1 text-xs text-slate-500">No matching country, state, city, or street.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {mapsError || "No matching locations near you. Try a street, city, or state name."}
+          </p>
         ) : null}
       </div>
       <button type="button" className={fieldClass.GHOST} disabled={locating} onClick={() => void useCurrentLocation()}>
-        {locating ? "Finding locations near you…" : "Use my current location"}
+        {locating ? "Detecting your location…" : "Use my current location"}
       </button>
       {originLocation.trim() && deliveryPoint ? (
         <p className="text-sm text-slate-700">
