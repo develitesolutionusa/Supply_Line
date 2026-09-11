@@ -7,7 +7,7 @@
     "lint": "eslint",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/pricing.test.ts tests/orders-status.test.ts tests/auth-paths.test.ts tests/account-type.test.ts tests/database-types.test.ts tests/inventory-alerts.test.ts tests/admin-email.test.ts tests/tax-rules.test.ts tests/order-access.test.ts tests/stripe-customer.test.ts tests/checkout-intent.test.ts tests/admin-metrics.test.ts tests/rate-limit.test.ts tests/catalog-search.test.ts tests/http-rate-limit.test.ts tests/f8-polish.test.ts",
+    "test": "tsx --test tests/pricing.test.ts tests/orders-status.test.ts tests/auth-paths.test.ts tests/account-type.test.ts tests/database-types.test.ts tests/inventory-alerts.test.ts tests/admin-email.test.ts tests/tax-rules.test.ts tests/order-access.test.ts tests/stripe-customer.test.ts tests/checkout-intent.test.ts tests/admin-metrics.test.ts tests/rate-limit.test.ts tests/catalog-search.test.ts tests/http-rate-limit.test.ts tests/f8-polish.test.ts tests/places.test.ts",
     "test:integration": "tsx --test tests/checkout-integration.test.ts",
     "load:test": "node tests/load-catalog.mjs",
     "lighthouse": "node tests/lighthouse.mjs",

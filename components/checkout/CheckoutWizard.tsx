@@ -5,6 +5,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { DeliveryOriginField } from "@/components/checkout/DeliveryOriginField";
 import { StepIndicator } from "@/components/ui/StepIndicator";
 import { PanelSkeleton } from "@/components/ui/PageSkeleton";
 import { emitCartUpdated } from "@/lib/cart/client";
@@ -73,7 +74,6 @@ export function CheckoutWizard() {
   const [address, setAddress] = useState<AddressDraft>(emptyAddress);
   const [delivery, setDelivery] = useState("standard");
   const [originLocation, setOriginLocation] = useState("");
-  const [locating, setLocating] = useState(false);
   const [order, setOrder] = useState<OrderRecord | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentMode, setPaymentMode] = useState<"stripe" | "demo" | null>(null);
@@ -128,39 +128,6 @@ export function CheckoutWizard() {
       cancelled = true;
     };
   }, [delivery, address.state, checkoutReady]);
-
-  async function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      setError("Location is not available in this browser. Enter your current location manually.");
-      return;
-    }
-    setLocating(true);
-    setError(null);
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 12_000,
-        });
-      });
-      const { latitude, longitude } = position.coords;
-      const fallback = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-      const response = await fetch(
-        `/api/checkout/reverse-geocode?lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}`,
-        { cache: "no-store" },
-      );
-      if (!response.ok) {
-        setOriginLocation(fallback);
-        return;
-      }
-      const payload = (await response.json()) as { location?: string };
-      setOriginLocation(payload.location?.trim() || fallback);
-    } catch {
-      setError("Could not read your current location. Enter it manually.");
-    } finally {
-      setLocating(false);
-    }
-  }
 
   async function createIntent() {
     setPending(true);
@@ -375,9 +342,8 @@ export function CheckoutWizard() {
               originLocation={originLocation}
               deliveryPoint={formatAddressLine(address)}
               delivery={delivery}
-              locating={locating}
               onChange={setOriginLocation}
-              onUseCurrentLocation={() => void useCurrentLocation()}
+              onError={setError}
             />
           ) : null}
         </div>
@@ -568,65 +534,6 @@ function AddressFields({
           autoComplete="postal-code"
         />
       </div>
-    </div>
-  );
-}
-
-function DeliveryOriginField({
-  originLocation,
-  deliveryPoint,
-  delivery,
-  locating,
-  onChange,
-  onUseCurrentLocation,
-}: {
-  originLocation: string;
-  deliveryPoint: string;
-  delivery: string;
-  locating: boolean;
-  onChange: (value: string) => void;
-  onUseCurrentLocation: () => void;
-}) {
-  const method = DELIVERY_METHODS.find((item) => item.id === delivery);
-  const feeLabel = method?.shipping_cents != null ? formatCents(method.shipping_cents) : "";
-
-  return (
-    <div className="space-y-3 rounded-md border border-slate-200 bg-canvas p-4">
-      <div>
-        <label className={fieldClass.LABEL} htmlFor="checkout-origin">
-          Current location
-        </label>
-        <input
-          id="checkout-origin"
-          className={fieldClass.INPUT}
-          value={originLocation}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Street, city, or GPS coordinates"
-          autoComplete="off"
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Used as the pickup point for this delivery. The destination is the shipping address above.
-        </p>
-      </div>
-      <button
-        type="button"
-        className={fieldClass.GHOST}
-        disabled={locating}
-        onClick={onUseCurrentLocation}
-      >
-        {locating ? "Finding location…" : "Use my current location"}
-      </button>
-      {originLocation.trim() && deliveryPoint ? (
-        <p className="text-sm text-slate-700">
-          {method?.label ?? "Delivery"} {feeLabel} from{" "}
-          <span className="font-medium text-navy">{originLocation.trim()}</span> to{" "}
-          <span className="font-medium text-navy">{deliveryPoint}</span>.
-        </p>
-      ) : (
-        <p className="text-sm text-slate-600">
-          {method?.label ?? "Delivery"} is {feeLabel} from your current location to the delivery address.
-        </p>
-      )}
     </div>
   );
 }
