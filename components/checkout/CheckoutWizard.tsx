@@ -420,8 +420,8 @@ export function CheckoutWizard() {
   );
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
-      <div className="rounded-md border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">{body}</div>
+    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="min-w-0 rounded-md border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)] sm:p-6">{body}</div>
       <aside className="h-fit rounded-md border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
         <h2 className="text-lg font-semibold text-navy">Order total</h2>
         <dl className="mt-4 space-y-2 text-sm">

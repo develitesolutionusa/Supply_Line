@@ -73,7 +73,7 @@ export function Header({ showAdmin = false }: { showAdmin?: boolean }) {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
           <HeaderSearch />
           <AuthNav appearance="toolbar" />
           <CartButton />
@@ -81,7 +81,10 @@ export function Header({ showAdmin = false }: { showAdmin?: boolean }) {
       </div>
 
       {open ? (
-        <div id={panelId} className="border-t border-slate-200/80 bg-white lg:hidden">
+        <div
+          id={panelId}
+          className="max-h-[min(70dvh,calc(100dvh-4rem))] overflow-y-auto border-t border-slate-200/80 bg-white lg:hidden"
+        >
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6">
             <nav className="flex flex-col gap-1" aria-label="Mobile">
               {links.map((link) => {

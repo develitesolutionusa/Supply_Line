@@ -24,7 +24,7 @@ export function Toast({
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-navy shadow-lg"
+      className="fixed inset-x-4 bottom-20 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-navy shadow-lg sm:inset-x-auto sm:right-4 sm:bottom-4"
     >
       <p className="flex-1">{message}</p>
       <button

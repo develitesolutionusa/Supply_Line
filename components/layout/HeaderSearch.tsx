@@ -56,12 +56,12 @@ export function HeaderSearch() {
   }
 
   return (
-    <div ref={rootRef} className="min-w-0">
+    <div ref={rootRef} className="min-w-0 flex-1 sm:flex-none">
       <form
         action="/catalog"
         method="get"
         role="search"
-        className="flex h-9 w-[min(16rem,46vw)] items-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200 sm:w-64 lg:w-72"
+        className="flex h-9 w-full min-w-0 max-w-[18rem] items-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200 sm:w-64 lg:w-72"
         onSubmit={() => setOpen(false)}
       >
         <label htmlFor={fieldId} className="sr-only">

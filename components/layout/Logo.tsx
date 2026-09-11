@@ -40,7 +40,7 @@ export function Logo({ appearance = "light" }: { appearance?: "light" | "dark" }
         <span className={`${wordmark} block text-[17px] font-semibold tracking-[-0.03em]`}>
           Supply<span className="font-medium">Line</span>
         </span>
-        <span className={`${wordmark} mt-1 block text-[9px] font-semibold uppercase tracking-[0.28em]`}>
+        <span className={`${wordmark} mt-1 hidden text-[9px] font-semibold uppercase tracking-[0.28em] sm:block`}>
           {SITE_TAGLINE}
         </span>
       </span>

@@ -115,7 +115,7 @@ export function CartView() {
   const { totals } = cart;
 
   return (
-    <div className="grid gap-8 pb-24 lg:grid-cols-[1fr_20rem] lg:pb-0">
+    <div className="grid gap-8 pb-28 lg:grid-cols-[minmax(0,1fr)_20rem] lg:pb-0">
       <ul className="space-y-4">
         {cart.items.map((item) => (
           <li key={item.id} className="rounded-md border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
@@ -124,7 +124,7 @@ export function CartView() {
                 <div className="w-20 shrink-0">
                   <ProductMedia name={item.product.name} sku={item.product.sku} imageUrl={item.product.image_url} />
                 </div>
-                <div>
+                <div className="min-w-0">
                 <Link
                   href={`/products/${item.product.sku}`}
                   className={`font-semibold text-navy hover:underline ${fieldClass.RING}`}
@@ -138,14 +138,14 @@ export function CartView() {
                 </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <QtyInput
                   id={item.id}
                   name={item.product.name}
                   cases={item.cases}
                   onCommit={(next, previous) => void changeQty(item.id, next, previous)}
                 />
-                <p className="w-24 text-right text-sm font-semibold text-navy">
+                <p className="min-w-[4.5rem] text-right text-sm font-semibold text-navy">
                   {formatCents(item.line_total_cents)}
                 </p>
                 <button
@@ -201,7 +201,7 @@ export function CartView() {
           Continue shopping
         </Link>
       </aside>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white p-3 lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
         <Link href="/checkout" className={`${fieldClass.BUTTON} w-full`}>
           Checkout · {formatCents(totals.total_cents)}
         </Link>
