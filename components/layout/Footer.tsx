@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { SocialIcons } from "@/components/layout/SocialIcons";
 import { COMPANY, companyAddressLine } from "@/lib/company";
-import { FOOTER_ACCOUNT_LINKS, FOOTER_COMPANY_LINKS, FOOTER_SHOP_LINKS, SITE_NAME } from "@/lib/nav";
+import { FOOTER_ACCOUNT_LINKS, FOOTER_COMPANY_LINKS, FOOTER_SHOP_LINKS } from "@/lib/nav";
 
 function FooterLinks({
   title,
@@ -56,14 +56,6 @@ export function Footer() {
         <FooterLinks title="Shop" links={FOOTER_SHOP_LINKS} />
         <FooterLinks title="Company" links={FOOTER_COMPANY_LINKS} />
         <FooterLinks title="Account" links={FOOTER_ACCOUNT_LINKS} />
-      </div>
-      <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>
-            © {new Date().getFullYear()} {SITE_NAME}. Wholesale desk in Dallas, TX.
-          </p>
-          <SocialIcons />
-        </div>
       </div>
     </footer>
   );

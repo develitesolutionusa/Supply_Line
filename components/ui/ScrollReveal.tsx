@@ -3,55 +3,36 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
+const SKIP_PREFIXES = ["/checkout", "/cart", "/sign-in", "/sign-up"];
+
+function shouldSkipPath(pathname: string) {
+  return SKIP_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 function collectTargets(root: HTMLElement) {
-  const seen = new Set<HTMLElement>();
-
-  function add(els: Iterable<Element>) {
-    for (const el of els) {
-      if (!(el instanceof HTMLElement)) continue;
-      if (el.tagName === "SCRIPT" || el.tagName === "ASIDE" || el.hidden) continue;
-      if (el.classList.contains("hero-section")) continue;
-      seen.add(el);
-    }
-  }
-
-  const sections = root.querySelectorAll(":scope section");
-  if (sections.length) {
-    add(sections);
-    return [...seen];
-  }
-
-  let node = root.firstElementChild;
-  while (
-    node instanceof HTMLElement &&
-    node.children.length === 1 &&
-    !node.matches("form, ul, ol, table")
-  ) {
-    node = node.firstElementChild;
-  }
-
-  if (node instanceof HTMLElement && node.children.length > 1) {
-    add(node.children);
-  } else if (node instanceof HTMLElement) {
-    add([node]);
-  }
-
-  return [...seen];
+  return [...root.querySelectorAll(":scope section")].filter((el): el is HTMLElement => {
+    if (!(el instanceof HTMLElement) || el.hidden) return false;
+    if (el.classList.contains("hero-section")) return false;
+    return true;
+  });
 }
 
 export function ScrollReveal() {
   const pathname = usePathname();
 
   useEffect(() => {
+    if (shouldSkipPath(pathname)) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
 
+    let cancelled = false;
     let observer: IntersectionObserver | undefined;
     let nodes: HTMLElement[] = [];
     let frame = 0;
 
-    frame = window.requestAnimationFrame(() => {
+    function apply() {
+      if (cancelled) return;
       const root = document.getElementById("main-content");
       if (!root) return;
 
@@ -81,9 +62,17 @@ export function ScrollReveal() {
         }
         observer?.observe(el);
       });
-    });
+    }
+
+    // Parent effects can run before streamed RSC segments hydrate. Mutating
+    // those nodes first makes React see a class/style mismatch.
+    const timer = window.setTimeout(() => {
+      frame = window.requestAnimationFrame(apply);
+    }, 0);
 
     return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
       window.cancelAnimationFrame(frame);
       observer?.disconnect();
       nodes.forEach((el) => {
