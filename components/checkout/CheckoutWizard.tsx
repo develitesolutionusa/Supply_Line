@@ -1,10 +1,8 @@
 "use client";
 
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { DeliveryOriginField } from "@/components/checkout/DeliveryOriginField";
 import { StepIndicator } from "@/components/ui/StepIndicator";
 import { PanelSkeleton } from "@/components/ui/PageSkeleton";
@@ -18,11 +16,7 @@ import {
 import { fieldClass } from "@/lib/ui";
 import type { AddressRecord, CartTotals, DeliveryMethod, OrderRecord } from "@/types/commerce";
 
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-  : null;
-const STRIPE_APPEARANCE = { theme: "stripe" as const };
-const PAYMENT_ELEMENT_OPTIONS = { layout: "tabs" as const };
+const STEPS = ["Shipping", "Review"];
 
 type Line = {
   id?: string;
@@ -41,7 +35,6 @@ type CheckoutPayload = {
   addresses: AddressRecord[];
   customer: { name: string | null; email: string | null };
   tax_exempt: boolean;
-  stripe_configured: boolean;
 };
 
 type AddressDraft = {
@@ -74,9 +67,8 @@ export function CheckoutWizard() {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [delivery, setDelivery] = useState("standard");
   const [originLocation, setOriginLocation] = useState("");
+  const [originCoords, setOriginCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [order, setOrder] = useState<OrderRecord | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentMode, setPaymentMode] = useState<"stripe" | "demo" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,20 +109,33 @@ export function CheckoutWizard() {
   useEffect(() => {
     if (!checkoutReady) return;
     let cancelled = false;
-    async function refresh() {
-      const params = new URLSearchParams({ delivery, state: address.state });
-      const response = await fetch(`/api/checkout?${params.toString()}`, { cache: "no-store" });
-      if (!response.ok || cancelled) return;
-      const payload = (await response.json()) as CheckoutPayload;
-      if (!cancelled) setData(payload);
-    }
-    void refresh();
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        const params = new URLSearchParams({
+          delivery,
+          state: address.state,
+          line1: address.line1,
+          city: address.city,
+          zip: address.zip,
+        });
+        if (originLocation.trim()) params.set("origin", originLocation.trim());
+        if (originCoords) {
+          params.set("origin_lat", String(originCoords.lat));
+          params.set("origin_lon", String(originCoords.lon));
+        }
+        const response = await fetch(`/api/checkout?${params.toString()}`, { cache: "no-store" });
+        if (!response.ok || cancelled) return;
+        const payload = (await response.json()) as CheckoutPayload;
+        if (!cancelled) setData(payload);
+      })();
+    }, 500);
     return () => {
       cancelled = true;
+      window.clearTimeout(handle);
     };
-  }, [delivery, address.state, checkoutReady]);
+  }, [delivery, address.line1, address.city, address.state, address.zip, originLocation, originCoords, checkoutReady]);
 
-  async function createIntent() {
+  async function createOrder() {
     setPending(true);
     setError(null);
     try {
@@ -141,22 +146,22 @@ export function CheckoutWizard() {
           delivery_method: delivery,
           address,
           origin_location: originLocation.trim() || undefined,
+          origin_lat: originCoords?.lat,
+          origin_lon: originCoords?.lon,
         }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Could not start payment");
+      if (!response.ok) throw new Error(payload.error ?? "Could not start checkout");
       setOrder(payload.order);
-      setClientSecret(payload.client_secret);
-      setPaymentMode(payload.payment_mode);
       setStep(1);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Could not start payment");
+      setError(createError instanceof Error ? createError.message : "Could not start checkout");
     } finally {
       setPending(false);
     }
   }
 
-  async function placeDemoOrder() {
+  async function placeOrder() {
     if (!order) return;
     setPending(true);
     setError(null);
@@ -167,11 +172,11 @@ export function CheckoutWizard() {
         body: JSON.stringify({ order_id: order.id }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Payment failed");
+      if (!response.ok) throw new Error(payload.error ?? "Could not place order");
       emitCartUpdated();
       router.push(`/checkout/confirmation?order=${payload.order.id}`);
     } catch (payError) {
-      setError(payError instanceof Error ? payError.message : "Payment failed");
+      setError(payError instanceof Error ? payError.message : "Could not place order");
     } finally {
       setPending(false);
     }
@@ -179,27 +184,19 @@ export function CheckoutWizard() {
 
   async function goNext() {
     setError(null);
-    if (step === 0) {
-      if (!name.trim() || !email.trim()) {
-        setError("Name and email are required.");
-        return;
-      }
-      if (!address.line1 || !address.city || !address.state || !address.zip) {
-        setError("A complete shipping address is required.");
-        return;
-      }
-      if (requiresDeliveryLocation(delivery) && !originLocation.trim()) {
-        setError("Enter your current location for local or expedited delivery.");
-        return;
-      }
-      await createIntent();
+    if (!name.trim() || !email.trim()) {
+      setError("Name and email are required.");
       return;
     }
-    if (step === 1) {
-      setStep(2);
+    if (!address.line1 || !address.city || !address.state || !address.zip) {
+      setError("A complete shipping address is required.");
       return;
     }
-    setStep((value) => value + 1);
+    if (requiresDeliveryLocation(delivery) && !originLocation.trim()) {
+      setError("Enter your current location for local or expedited delivery.");
+      return;
+    }
+    await createOrder();
   }
 
   if (!data && !error) {
@@ -225,25 +222,20 @@ export function CheckoutWizard() {
     );
   }
 
-  const steps =
-    paymentMode === "stripe" || (stripePromise && paymentMode !== "demo")
-      ? ["Shipping", "Review & pay"]
-      : ["Shipping", "Payment", "Review"];
-  const lastStep = steps.length - 1;
-
   const displayTotals = order
     ? {
         subtotal_cents: order.subtotal_cents,
         shipping_cents: order.shipping_cents,
         tax_cents: order.tax_cents,
         total_cents: order.total_cents,
+        delivery_km: data.cart.totals.delivery_km,
       }
     : data.cart.totals;
   const lines: Line[] = order?.items ?? data.cart.items;
 
   const body = (
     <>
-      <StepIndicator steps={steps} current={step} />
+      <StepIndicator steps={STEPS} current={step} />
 
       {step === 0 ? (
         <div className="mt-8 space-y-8">
@@ -357,43 +349,23 @@ export function CheckoutWizard() {
               originLocation={originLocation}
               deliveryPoint={formatAddressLine(address)}
               delivery={delivery}
-              onChange={setOriginLocation}
+              deliveryKm={data.cart.totals.delivery_km}
+              shippingCents={
+                requiresDeliveryLocation(delivery) && data.cart.totals.delivery_km != null
+                  ? data.cart.totals.shipping_cents
+                  : null
+              }
+              onChange={(value, coords) => {
+                setOriginLocation(value);
+                setOriginCoords(coords ?? null);
+              }}
               onError={setError}
             />
           ) : null}
         </div>
       ) : null}
 
-      {step === 1 && paymentMode === "stripe" && clientSecret && order ? (
-        <div className="mt-8 space-y-6">
-          <CheckoutReview
-            name={name}
-            email={email}
-            address={address}
-            delivery={delivery}
-            originLocation={originLocation}
-            lines={lines}
-          />
-          <StripePaymentForm
-            clientSecret={clientSecret}
-            orderId={order.id}
-            onError={setError}
-            onBack={() => setStep(0)}
-          />
-        </div>
-      ) : null}
-
-      {step === 1 && paymentMode !== "stripe" ? (
-        <div className="mt-8 rounded-md border border-slate-200 bg-canvas p-4 text-sm text-slate-700">
-          <p className="font-medium text-navy">Payment</p>
-          <p className="mt-2">
-            Stripe keys are not configured, so a card form is not shown. Continue to review and place a
-            demo order, or add Stripe test keys to embed the Payment Element.
-          </p>
-        </div>
-      ) : null}
-
-      {step === 2 ? (
+      {step === 1 ? (
         <div className="mt-8">
           <CheckoutReview
             name={name}
@@ -401,6 +373,8 @@ export function CheckoutWizard() {
             address={address}
             delivery={delivery}
             originLocation={originLocation}
+            deliveryKm={displayTotals.delivery_km}
+            shippingCents={displayTotals.shipping_cents}
             lines={lines}
           />
         </div>
@@ -412,38 +386,36 @@ export function CheckoutWizard() {
         </p>
       ) : null}
 
-      {step === 1 && paymentMode === "stripe" ? null : (
-        <div className="mt-8 flex flex-wrap gap-3">
-          {step > 0 ? (
-            <button
-              type="button"
-              className={fieldClass.GHOST}
-              onClick={() => setStep((value) => value - 1)}
-            >
-              Back
-            </button>
-          ) : null}
-          {step < lastStep ? (
-            <button
-              type="button"
-              disabled={pending}
-              className={fieldClass.BUTTON}
-              onClick={() => void goNext()}
-            >
-              {pending ? "Working…" : step === 0 ? "Continue to payment" : "Continue to review"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={pending}
-              className={fieldClass.BUTTON}
-              onClick={() => void placeDemoOrder()}
-            >
-              {pending ? "Placing order…" : "Place order"}
-            </button>
-          )}
-        </div>
-      )}
+      <div className="mt-8 flex flex-wrap gap-3">
+        {step > 0 ? (
+          <button
+            type="button"
+            className={fieldClass.GHOST}
+            onClick={() => setStep(0)}
+          >
+            Back
+          </button>
+        ) : null}
+        {step === 0 ? (
+          <button
+            type="button"
+            disabled={pending}
+            className={fieldClass.BUTTON}
+            onClick={() => void goNext()}
+          >
+            {pending ? "Working…" : "Continue to review"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={pending}
+            className={fieldClass.BUTTON}
+            onClick={() => void placeOrder()}
+          >
+            {pending ? "Placing order…" : "Place order"}
+          </button>
+        )}
+      </div>
     </>
   );
 
@@ -452,14 +424,17 @@ export function CheckoutWizard() {
       <div className="rounded-md border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">{body}</div>
       <aside className="h-fit rounded-md border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]">
         <h2 className="text-lg font-semibold text-navy">Order total</h2>
-        <p className="mt-1 text-xs text-slate-500">Calculated on the server from live cart prices.</p>
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between">
             <dt>Subtotal</dt>
             <dd>{formatCents(displayTotals.subtotal_cents)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>{requiresDeliveryLocation(delivery) ? "Delivery" : "Shipping"}</dt>
+            <dt>
+              {requiresDeliveryLocation(delivery)
+                ? `Delivery${displayTotals.delivery_km ? ` · ${displayTotals.delivery_km} km` : ""}`
+                : "Shipping"}
+            </dt>
             <dd>{formatCents(displayTotals.shipping_cents)}</dd>
           </div>
           <div className="flex justify-between">
@@ -559,6 +534,8 @@ function CheckoutReview({
   address,
   delivery,
   originLocation,
+  deliveryKm,
+  shippingCents,
   lines,
 }: {
   name: string;
@@ -566,10 +543,13 @@ function CheckoutReview({
   address: AddressDraft;
   delivery: string;
   originLocation: string;
+  deliveryKm?: number | null;
+  shippingCents?: number;
   lines: Line[];
 }) {
   const method = DELIVERY_METHODS.find((item) => item.id === delivery);
   const destination = formatAddressLine(address);
+  const fee = shippingCents ?? method?.shipping_cents;
 
   return (
     <div className="space-y-4 text-sm">
@@ -579,7 +559,8 @@ function CheckoutReview({
       <p className="text-slate-600">{destination}</p>
       <p className="text-slate-600">
         Delivery: {method?.label ?? delivery}
-        {method?.shipping_cents != null ? ` · ${formatCents(method.shipping_cents)}` : ""}
+        {deliveryKm ? ` · ${deliveryKm} km` : ""}
+        {fee != null ? ` · ${formatCents(fee)}` : ""}
       </p>
       {requiresDeliveryLocation(delivery) && originLocation.trim() ? (
         <p className="text-slate-600">
@@ -604,99 +585,5 @@ function CheckoutReview({
         })}
       </ul>
     </div>
-  );
-}
-
-function StripePaymentForm({
-  clientSecret,
-  orderId,
-  onError,
-  onBack,
-}: {
-  clientSecret: string;
-  orderId: string;
-  onError: (message: string | null) => void;
-  onBack: () => void;
-}) {
-  const options = useMemo(
-    () => ({ clientSecret, appearance: STRIPE_APPEARANCE }),
-    [clientSecret],
-  );
-
-  if (!stripePromise) {
-    return <p className="text-sm text-rose-700">Stripe is not configured.</p>;
-  }
-
-  return (
-    <Elements stripe={stripePromise} options={options}>
-      <StripePaymentFields orderId={orderId} onError={onError} onBack={onBack} />
-    </Elements>
-  );
-}
-
-function StripePaymentFields({
-  orderId,
-  onError,
-  onBack,
-}: {
-  orderId: string;
-  onError: (message: string | null) => void;
-  onBack: () => void;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [ready, setReady] = useState(false);
-  const [pending, setPending] = useState(false);
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!stripe || !elements || !ready) {
-      onError("Payment form is still loading. Please wait a moment and try again.");
-      return;
-    }
-
-    setPending(true);
-    onError(null);
-
-    const result = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/checkout/confirmation?order=${orderId}`,
-      },
-      redirect: "if_required",
-    });
-
-    if (result.error) {
-      onError(result.error.message ?? "Your card was declined.");
-      setPending(false);
-      return;
-    }
-
-    window.location.href = `/checkout/confirmation?order=${orderId}`;
-  }
-
-  return (
-    <form className="space-y-6" onSubmit={(event) => void onSubmit(event)}>
-      <div>
-        <p className="mb-3 text-sm font-medium text-navy">Payment method</p>
-        <PaymentElement options={PAYMENT_ELEMENT_OPTIONS} onReady={() => setReady(true)} />
-      </div>
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          className={fieldClass.GHOST}
-          onClick={onBack}
-        >
-          Back
-        </button>
-        <button
-          type="submit"
-          disabled={pending || !stripe || !ready}
-          className={fieldClass.BUTTON}
-        >
-          {pending ? "Processing…" : ready ? "Place order" : "Loading payment…"}
-        </button>
-      </div>
-    </form>
   );
 }

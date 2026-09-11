@@ -81,24 +81,28 @@ describe("tax and shipping", () => {
     assert.equal(requiresDeliveryLocation("pickup"), false);
   });
 
-  it("charges $2 for local and $3 for expedited delivery", () => {
-    assert.equal(shippingCentsForMethod("local", 1_000), 200);
-    assert.equal(shippingCentsForMethod("expedited", 1_000), 300);
+  it("charges local and expedited delivery by the kilometer", () => {
+    assert.equal(shippingCentsForMethod("local", 1_000), 0);
+    assert.equal(shippingCentsForMethod("local", 1_000, 8), 1600);
+    assert.equal(shippingCentsForMethod("expedited", 1_000, 8), 2400);
     const local = calculateCartTotals({
       lineSubtotalsCents: [10000],
       deliveryMethodId: "local",
       shippingState: "TX",
       taxExempt: true,
+      distanceKm: 8,
     });
     const expedited = calculateCartTotals({
       lineSubtotalsCents: [10000],
       deliveryMethodId: "expedited",
       shippingState: "TX",
       taxExempt: true,
+      distanceKm: 8,
     });
-    assert.equal(local.shipping_cents, 200);
-    assert.equal(expedited.shipping_cents, 300);
-    assert.equal(local.total_cents, 10200);
-    assert.equal(expedited.total_cents, 10300);
+    assert.equal(local.shipping_cents, 1600);
+    assert.equal(local.delivery_km, 8);
+    assert.equal(expedited.shipping_cents, 2400);
+    assert.equal(local.total_cents, 11600);
+    assert.equal(expedited.total_cents, 12400);
   });
 });

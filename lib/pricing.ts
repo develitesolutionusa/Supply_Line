@@ -2,6 +2,8 @@ import type { AccountTier, CartTotals, DeliveryMethod, PriceTier, StockStatus } 
 
 export const FREE_SHIPPING_THRESHOLD_CENTS = 25_000;
 export const FLAT_SHIPPING_CENTS = 1_499;
+export const LOCAL_CENTS_PER_KM = 200;
+export const EXPEDITED_CENTS_PER_KM = 300;
 
 export type TaxRuleMap = Record<string, number>;
 
@@ -25,8 +27,8 @@ export const DELIVERY_METHODS: DeliveryMethod[] = [
   {
     id: "local",
     label: "Local delivery",
-    description: "$2 from your current location to the delivery address, typically next business day.",
-    shipping_cents: 200,
+    description: "$2.00 per km from your current location to the delivery address, typically next business day.",
+    shipping_cents: null,
   },
   {
     id: "standard",
@@ -37,8 +39,8 @@ export const DELIVERY_METHODS: DeliveryMethod[] = [
   {
     id: "expedited",
     label: "Expedited delivery",
-    description: "$3 from your current location to the delivery address, typically two-day freight.",
-    shipping_cents: 300,
+    description: "$3.00 per km from your current location to the delivery address, typically two-day freight.",
+    shipping_cents: null,
   },
 ];
 
@@ -96,10 +98,22 @@ export function taxRateForState(
   return taxRules[stateCode.toUpperCase()] ?? 0;
 }
 
+export function centsPerKmForMethod(methodId: string) {
+  if (methodId === "local") return LOCAL_CENTS_PER_KM;
+  if (methodId === "expedited") return EXPEDITED_CENTS_PER_KM;
+  return null;
+}
+
 export function shippingCentsForMethod(
   methodId: string,
   subtotalCents: number,
+  distanceKm?: number | null,
 ): number {
+  const perKm = centsPerKmForMethod(methodId);
+  if (perKm != null) {
+    if (distanceKm == null || distanceKm < 1) return 0;
+    return distanceKm * perKm;
+  }
   const method = DELIVERY_METHODS.find((item) => item.id === methodId) ?? DELIVERY_METHODS[2];
   if (method.shipping_cents !== null) {
     return method.shipping_cents;
@@ -113,9 +127,14 @@ export function calculateCartTotals(options: {
   shippingState?: string;
   taxExempt: boolean;
   taxRules?: TaxRuleMap;
+  distanceKm?: number | null;
 }): CartTotals {
   const subtotal_cents = options.lineSubtotalsCents.reduce((sum, value) => sum + value, 0);
-  const shipping_cents = shippingCentsForMethod(options.deliveryMethodId, subtotal_cents);
+  const shipping_cents = shippingCentsForMethod(
+    options.deliveryMethodId,
+    subtotal_cents,
+    options.distanceKm,
+  );
   const rate = taxRateForState(options.shippingState, options.taxExempt, options.taxRules);
   const tax_cents = Math.round((subtotal_cents * rate) / 100);
   const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD_CENTS - subtotal_cents);
@@ -127,6 +146,7 @@ export function calculateCartTotals(options: {
     total_cents: subtotal_cents + shipping_cents + tax_cents,
     free_shipping_threshold_cents: FREE_SHIPPING_THRESHOLD_CENTS,
     remaining_for_free_shipping_cents: remaining,
+    delivery_km: options.distanceKm ?? null,
   };
 }
 

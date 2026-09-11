@@ -33,6 +33,5 @@ describe("auth path protection", () => {
     assert.equal(isProtectedPath("/api/products"), false);
     assert.equal(isProtectedPath("/api/categories"), false);
     assert.equal(isProtectedPath("/api/webhooks/clerk"), false);
-    assert.equal(isProtectedPath("/api/webhooks/stripe"), false);
   });
 });

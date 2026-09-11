@@ -1,3 +1,4 @@
+import { billableDeliveryKm, distanceKm } from "@/lib/geo";
 import {
   DEFAULT_COUNTRY_CODE,
   PLACES_USER_AGENT,
@@ -111,4 +112,51 @@ export async function resolveRegion(lat: number, lon: number) {
   const resolved = await reverseGeocode(lat, lon);
   const places = await nearbySuggestions(resolved.region, lat, lon);
   return { ...resolved, places };
+}
+
+export async function geocodeLocation(query: string) {
+  const q = query.trim();
+  if (!q) return null;
+
+  const photon = (await readJson(
+    `https://photon.komoot.io/api/?${new URLSearchParams({ q, limit: "1", lang: "en" }).toString()}`,
+  )) as { features?: PhotonFeature[] } | null;
+  for (const feature of photon?.features ?? []) {
+    const lon = feature.geometry?.coordinates?.[0];
+    const lat = feature.geometry?.coordinates?.[1];
+    if (lat != null && lon != null && isValidCoord(lat, lon)) {
+      return { lat, lon };
+    }
+  }
+
+  const nominatim = await readJson(
+    `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+      q,
+      format: "jsonv2",
+      limit: "1",
+    }).toString()}`,
+  );
+  if (!Array.isArray(nominatim) || nominatim.length === 0) return null;
+  const first = nominatim[0] as NominatimPlace;
+  const lat = first.lat == null || first.lat === "" ? undefined : Number(first.lat);
+  const lon = first.lon == null || first.lon === "" ? undefined : Number(first.lon);
+  if (lat == null || lon == null || !isValidCoord(lat, lon)) return null;
+  return { lat, lon };
+}
+
+export async function resolveDeliveryKm(options: {
+  origin?: string;
+  originLat?: number;
+  originLon?: number;
+  destination?: string;
+}) {
+  const origin =
+    options.originLat != null && options.originLon != null && isValidCoord(options.originLat, options.originLon)
+      ? { lat: options.originLat, lon: options.originLon }
+      : await geocodeLocation(options.origin ?? "");
+  const destination = await geocodeLocation(options.destination ?? "");
+  if (!origin || !destination) return null;
+  const km = distanceKm(origin, destination);
+  if (km == null) return null;
+  return billableDeliveryKm(km);
 }

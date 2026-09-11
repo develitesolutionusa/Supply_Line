@@ -24,7 +24,7 @@ const SERVICES = [
   },
   {
     title: "Local and expedited delivery",
-    body: "Local delivery is a $2 desk-to-door run for same-metro restocks. Expedited delivery is $3 when you need the next freight window. Standard ground still goes free over the published threshold. Pickup is available at the Dallas DC during warehouse hours.",
+    body: "Local delivery is $2.00 per km from your current location to the delivery address. Expedited delivery is $3.00 per km when you need the next freight window. Standard ground still goes free over the published threshold. Pickup is available at the Dallas DC during warehouse hours.",
     image: "/images/company/about-services-delivery.png",
     alt: "Cases of supplies handed off at a restaurant loading dock",
   },

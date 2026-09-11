@@ -11,6 +11,8 @@ export type PlaceSuggestion = {
   secondary: string;
   kind?: PlaceKind;
   code?: string;
+  lat?: number;
+  lon?: number;
 };
 
 export type RegionContext = {
@@ -44,10 +46,13 @@ export type NominatimPlace = {
   type?: string;
   name?: string;
   display_name?: string;
+  lat?: string;
+  lon?: string;
   address?: NominatimAddress;
 };
 
 export type PhotonFeature = {
+  geometry?: { coordinates?: number[] };
   properties?: {
     osm_id?: number | string;
     osm_type?: string;
@@ -122,6 +127,8 @@ export function formatPhotonFeature(feature: PhotonFeature): PlaceSuggestion | n
   if (!primary || !label) return null;
   const kind = kindFromPhotonType(props.type);
   const secondary = [kind ? PLACE_KIND_LABEL[kind] : "", [...new Set(parts)].join(", ")].filter(Boolean).join(" · ");
+  const lon = feature.geometry?.coordinates?.[0];
+  const lat = feature.geometry?.coordinates?.[1];
   return {
     id: String(props.osm_id ?? label),
     label,
@@ -129,6 +136,7 @@ export function formatPhotonFeature(feature: PhotonFeature): PlaceSuggestion | n
     secondary,
     kind,
     code: props.countrycode?.toLowerCase(),
+    ...(lat != null && lon != null && isValidCoord(lat, lon) ? { lat, lon } : {}),
   };
 }
 
@@ -166,12 +174,15 @@ export function formatNominatimPlace(item: NominatimPlace): PlaceSuggestion | nu
           : item.addresstype === "road"
             ? "street"
             : undefined;
+  const lat = item.lat == null || item.lat === "" ? undefined : Number(item.lat);
+  const lon = item.lon == null || item.lon === "" ? undefined : Number(item.lon);
   return {
     id: String(item.place_id ?? item.osm_id ?? label),
     label,
     primary,
     secondary: [kind ? PLACE_KIND_LABEL[kind] : "", ...new Set(parts)].filter(Boolean).join(" · "),
     kind,
+    ...(lat != null && lon != null && isValidCoord(lat, lon) ? { lat, lon } : {}),
   };
 }
 

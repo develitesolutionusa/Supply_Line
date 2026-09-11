@@ -2,16 +2,8 @@ import { NextResponse } from "next/server";
 import { getAccountContext } from "@/lib/auth/context";
 import { sendOrderConfirmation } from "@/lib/email";
 import { getOrder, markOrderPaid } from "@/lib/orders/service";
-import { stripeConfigured } from "@/lib/stripe/server";
 
 export async function POST(request: Request) {
-  if (stripeConfigured()) {
-    return NextResponse.json(
-      { error: "Demo payment is disabled when Stripe keys are present" },
-      { status: 400 },
-    );
-  }
-
   const account = await getAccountContext();
   if (!account.userId) {
     return NextResponse.json({ error: "Sign in required" }, { status: 401 });

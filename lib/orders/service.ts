@@ -3,7 +3,7 @@ import { getCartSnapshot, clearCart } from "@/lib/cart/service";
 import { notifyIfLowStockBreached } from "@/lib/inventory/alerts";
 import { assertCartHasStock } from "@/lib/inventory/stock";
 import { pageBounds } from "@/lib/pagination";
-import { DELIVERY_METHODS, requiresDeliveryLocation, resolveCasePrice } from "@/lib/pricing";
+import { DELIVERY_METHODS, formatAddressLine, requiresDeliveryLocation, resolveCasePrice } from "@/lib/pricing";
 import { ensureAppUser, ensureBusinessAccount } from "@/lib/supabase/identity";
 import { syncClerkIdentity } from "@/lib/sync/clerk";
 import { assertNoError, createServiceClient } from "@/lib/supabase/server";
@@ -124,6 +124,8 @@ export async function placeOrder(options: {
   deliveryMethodId: string;
   address: Omit<AddressRecord, "id" | "user_id">;
   originLocation?: string;
+  originLat?: number;
+  originLon?: number;
 }) {
   if (!DELIVERY_METHODS.some((method) => method.id === options.deliveryMethodId)) {
     throw new Error("Invalid delivery method");
@@ -138,6 +140,11 @@ export async function placeOrder(options: {
     taxExempt: options.taxExempt,
     deliveryMethodId: options.deliveryMethodId,
     shippingState: options.address.state,
+    originLocation: options.originLocation,
+    originLat: options.originLat,
+    originLon: options.originLon,
+    destination: formatAddressLine(options.address),
+    requireDistance: requiresDeliveryLocation(options.deliveryMethodId),
   });
 
   if (cart.items.length === 0) {
@@ -211,18 +218,6 @@ export async function placeOrder(options: {
   assertNoError(itemsError, "Could not create order items");
 
   return mapOrder(order as OrderRow);
-}
-
-export async function attachPaymentIntent(orderId: string, paymentIntentId: string) {
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .update({ stripe_payment_intent_id: paymentIntentId })
-    .eq("id", orderId)
-    .select("*")
-    .single();
-  assertNoError(error, "Order not found");
-  return mapOrder(data as OrderRow);
 }
 
 export async function markOrderPaid(orderId: string) {
@@ -376,18 +371,6 @@ export async function listAllOrders(status?: OrderStatus) {
 export async function getOrder(orderId: string) {
   const supabase = createServiceClient();
   const { data, error } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
-  assertNoError(error, "Could not load order");
-  if (!data) return null;
-  return mapOrder(data as OrderRow);
-}
-
-export async function getOrderByPaymentIntent(paymentIntentId: string) {
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("stripe_payment_intent_id", paymentIntentId)
-    .maybeSingle();
   assertNoError(error, "Could not load order");
   if (!data) return null;
   return mapOrder(data as OrderRow);

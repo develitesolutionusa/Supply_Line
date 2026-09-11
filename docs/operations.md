@@ -12,21 +12,20 @@ Confirm these before promoting `main` to production.
 ## Staging
 
 - Staging is the Vercel Preview environment for this repo.
-- Mirror production services, but keep Stripe in **test mode**.
+- Mirror production services.
 - Copy `.env.preview.example` into the Preview env (never Production).
-- QA the preview URL (catalog, checkout with a test card, admin, webhooks) before promoting `main`.
+- QA the preview URL (catalog, checkout, admin, Clerk webhooks) before promoting `main`.
 
 ## Observability
 
 - Set `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` on Preview and Production.
 - Set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` so production builds upload source maps.
-- Clerk and Stripe webhook failures are logged with `logError` and sent to Sentry.
+- Clerk webhook failures are logged with `logError` and sent to Sentry.
 
 ## Load and integration tests
 
 ```bash
 npm test
-npm run test:integration   # skipped unless STRIPE_SECRET_KEY is sk_test_
 npm run db:rls
 npm run lighthouse          # storefront a11y/SEO (dev server must be running)
 ```

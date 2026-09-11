@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAccountContext } from "@/lib/auth/context";
-import { attachPaymentIntent, placeOrder } from "@/lib/orders/service";
+import { placeOrder } from "@/lib/orders/service";
 import { requiresDeliveryLocation } from "@/lib/pricing";
-import { ensureCheckoutStripeCustomer } from "@/lib/stripe/customer";
-import { paymentIntentCreateParams } from "@/lib/stripe/payment-intent";
-import { getStripe, stripeConfigured } from "@/lib/stripe/server";
-import { ensureAppUser, getBusinessAccountByClerkOrg } from "@/lib/supabase/identity";
 import { logError } from "@/lib/observability";
 
 export async function POST(request: Request) {
@@ -17,6 +13,8 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     delivery_method?: string;
     origin_location?: string;
+    origin_lat?: number;
+    origin_lon?: number;
     address?: {
       label?: string;
       line1?: string;
@@ -47,6 +45,8 @@ export async function POST(request: Request) {
       taxExempt: account.taxExempt,
       deliveryMethodId: deliveryMethod,
       originLocation: body.origin_location,
+      originLat: body.origin_lat,
+      originLon: body.origin_lon,
       address: {
         label: body.address.label ?? "Shipping",
         line1: body.address.line1,
@@ -58,49 +58,11 @@ export async function POST(request: Request) {
       },
     });
 
-    if (!stripeConfigured()) {
-      return NextResponse.json({
-        order,
-        client_secret: null,
-        payment_mode: "demo" as const,
-      });
-    }
-
-    const stripe = getStripe();
-    if (!stripe) {
-      return NextResponse.json({ error: "Stripe is not configured" }, { status: 500 });
-    }
-
-    const user = await ensureAppUser(account.userId, account.email);
-    const business = account.orgId ? await getBusinessAccountByClerkOrg(account.orgId) : null;
-    const customerId =
-      (await ensureCheckoutStripeCustomer({
-        user,
-        business,
-        email: account.email,
-        name: account.fullName,
-      })) ?? undefined;
-
-    const intent = await stripe.paymentIntents.create(
-      paymentIntentCreateParams({
-        amountCents: order.total_cents,
-        orderId: order.id,
-        userId: account.userId,
-        customerId,
-      }),
-    );
-
-    await attachPaymentIntent(order.id, intent.id);
-
-    return NextResponse.json({
-      order: { ...order, stripe_payment_intent_id: intent.id },
-      client_secret: intent.client_secret,
-      payment_mode: "stripe" as const,
-    });
+    return NextResponse.json({ order });
   } catch (error) {
-    logError("checkout.create-intent", error, { userId: account.userId });
+    logError("checkout.create-order", error, { userId: account.userId });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not create payment" },
+      { error: error instanceof Error ? error.message : "Could not create order" },
       { status: 400 },
     );
   }

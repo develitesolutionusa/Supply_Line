@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth/requireUser";
 
 export const metadata = {
   title: "Checkout",
-  description: "Pay with Stripe. The charged amount is recalculated on the server from your cart.",
+  description: "Review your cart and place the order. Totals are recalculated on the server.",
 };
 
 export default async function CheckoutPage() {

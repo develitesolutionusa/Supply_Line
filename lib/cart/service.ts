@@ -1,5 +1,6 @@
 import { getProductById, getProductBySku } from "@/lib/catalog/query";
-import { calculateCartTotals, resolveCasePrice } from "@/lib/pricing";
+import { resolveDeliveryKm } from "@/lib/places-catalog";
+import { calculateCartTotals, requiresDeliveryLocation, resolveCasePrice } from "@/lib/pricing";
 import { loadTaxRules } from "@/lib/tax/rules";
 import { ensureAppUser } from "@/lib/supabase/identity";
 import { assertNoError, createServiceClient } from "@/lib/supabase/server";
@@ -45,10 +46,27 @@ export async function getCartSnapshot(options: {
   taxExempt: boolean;
   deliveryMethodId?: string;
   shippingState?: string;
+  originLocation?: string;
+  originLat?: number;
+  originLon?: number;
+  destination?: string;
+  requireDistance?: boolean;
 }) {
   const { cart } = await getOrCreateCart(options.userId);
   const items = await listCartItems(cart.id);
   const deliveryMethodId = options.deliveryMethodId ?? "standard";
+  let distanceKm: number | null = null;
+  if (requiresDeliveryLocation(deliveryMethodId)) {
+    distanceKm = await resolveDeliveryKm({
+      origin: options.originLocation,
+      originLat: options.originLat,
+      originLon: options.originLon,
+      destination: options.destination,
+    });
+    if (options.requireDistance && distanceKm == null) {
+      throw new Error("Could not measure the distance to the delivery address. Check the current location and shipping address.");
+    }
+  }
 
   const resolved = [];
   for (const item of items) {
@@ -70,6 +88,7 @@ export async function getCartSnapshot(options: {
     shippingState: options.shippingState,
     taxExempt: options.taxExempt,
     taxRules: await loadTaxRules(),
+    distanceKm,
   });
 
   return {

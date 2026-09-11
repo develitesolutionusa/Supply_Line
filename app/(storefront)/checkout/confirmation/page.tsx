@@ -39,7 +39,7 @@ export default async function ConfirmationPage({
       </div>
       {order.status === "payment_failed" ? (
         <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          Payment failed. Your cart is still available — try checkout again with another card.
+          This order could not be completed. Your cart is still available — try checkout again.
         </p>
       ) : null}
       <ul className="mt-8 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">

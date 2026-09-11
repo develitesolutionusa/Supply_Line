@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { DELIVERY_METHODS, formatCents } from "@/lib/pricing";
+import { centsPerKmForMethod, DELIVERY_METHODS, formatCents } from "@/lib/pricing";
 import { fieldClass } from "@/lib/ui";
 import {
   DEFAULT_COUNTRY_CODE,
@@ -47,17 +47,29 @@ export function DeliveryOriginField({
   originLocation,
   deliveryPoint,
   delivery,
+  deliveryKm,
+  shippingCents,
   onChange,
   onError,
 }: {
   originLocation: string;
   deliveryPoint: string;
   delivery: string;
-  onChange: (value: string) => void;
+  deliveryKm?: number | null;
+  shippingCents?: number | null;
+  onChange: (value: string, coords?: { lat: number; lon: number } | null) => void;
   onError: (message: string | null) => void;
 }) {
   const method = DELIVERY_METHODS.find((item) => item.id === delivery);
-  const feeLabel = method?.shipping_cents != null ? formatCents(method.shipping_cents) : "";
+  const perKm = centsPerKmForMethod(delivery);
+  const feeLabel =
+    shippingCents != null && deliveryKm
+      ? `${formatCents(shippingCents)} for ${deliveryKm} km`
+      : perKm != null
+        ? `${formatCents(perKm)} per km`
+        : method?.shipping_cents != null
+          ? formatCents(method.shipping_cents)
+          : "calculated";
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [region, setRegion] = useState<RegionContext>(emptyRegion);
@@ -151,7 +163,10 @@ export function DeliveryOriginField({
   function selectPlace(place: PlaceSuggestion) {
     setLiveSearch(false);
     applyRegion(place);
-    onChange(selectionLabel(place, region));
+    onChange(
+      selectionLabel(place, region),
+      place.lat != null && place.lon != null ? { lat: place.lat, lon: place.lon } : null,
+    );
     setOpen(false);
   }
 
@@ -181,6 +196,7 @@ export function DeliveryOriginField({
       setRegion(nextRegion);
       onChange(
         payload.location?.trim() || composeLocation(nextRegion) || `${next.lat.toFixed(5)}, ${next.lon.toFixed(5)}`,
+        next,
       );
       setPlaces(payload.places ?? []);
       setActiveIndex(0);
@@ -211,7 +227,7 @@ export function DeliveryOriginField({
           aria-activedescendant={open && places[activeIndex] ? `${listId}-${places[activeIndex].id}` : undefined}
           onChange={(event) => {
             setLiveSearch(true);
-            onChange(event.target.value);
+            onChange(event.target.value, null);
             setOpen(true);
           }}
           onFocus={() => {

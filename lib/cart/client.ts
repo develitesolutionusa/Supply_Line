@@ -21,6 +21,7 @@ export type CartResponse = {
     total_cents: number;
     free_shipping_threshold_cents: number;
     remaining_for_free_shipping_cents: number;
+    delivery_km?: number | null;
   };
   error?: string;
 };
