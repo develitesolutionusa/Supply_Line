@@ -6,7 +6,7 @@ import { sendOrderConfirmation } from "@/lib/email";
 import { logError, logInfo } from "@/lib/observability";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
-import { stripeWebhookAction } from "@/lib/stripe/webhook";
+import { paymentIntentAmountMatchesOrder, stripeWebhookAction } from "@/lib/stripe/webhook";
 import { withWebhookRateLimit } from "@/lib/http";
 
 export async function POST(request: Request) {
@@ -51,6 +51,15 @@ export async function POST(request: Request) {
     }
 
     if (action.action === "mark_paid") {
+      if (!paymentIntentAmountMatchesOrder(action.amount, order.total_cents)) {
+        logError("stripe.webhook.amount", new Error("PaymentIntent amount does not match order total"), {
+          paymentIntentId: action.paymentIntentId,
+          amount: action.amount,
+          orderId: order.id,
+          total_cents: order.total_cents,
+        });
+        return NextResponse.json({ error: "Payment amount mismatch" }, { status: 400 });
+      }
       const { order: paid, newlyPaid } = await markOrderPaid(order.id);
       if (newlyPaid) {
         const supabase = createServiceClient();

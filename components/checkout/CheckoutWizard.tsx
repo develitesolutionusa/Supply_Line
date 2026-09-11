@@ -18,7 +18,6 @@ import {
 import { fieldClass } from "@/lib/ui";
 import type { AddressRecord, CartTotals, DeliveryMethod, OrderRecord } from "@/types/commerce";
 
-const STEPS = ["Shipping", "Payment", "Review"];
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
@@ -72,6 +71,7 @@ export function CheckoutWizard() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState<AddressDraft>(emptyAddress);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [delivery, setDelivery] = useState("standard");
   const [originLocation, setOriginLocation] = useState("");
   const [order, setOrder] = useState<OrderRecord | null>(null);
@@ -91,6 +91,7 @@ export function CheckoutWizard() {
         setEmail(payload.customer.email || "");
         const preferred = payload.addresses.find((item) => item.is_default) ?? payload.addresses[0];
         if (preferred) {
+          setSelectedAddressId(preferred.id);
           setAddress({
             label: preferred.label,
             line1: preferred.line1,
@@ -198,7 +199,7 @@ export function CheckoutWizard() {
       setStep(2);
       return;
     }
-    setStep((value) => Math.min(STEPS.length - 1, value + 1));
+    setStep((value) => value + 1);
   }
 
   if (!data && !error) {
@@ -224,6 +225,12 @@ export function CheckoutWizard() {
     );
   }
 
+  const steps =
+    paymentMode === "stripe" || (stripePromise && paymentMode !== "demo")
+      ? ["Shipping", "Review & pay"]
+      : ["Shipping", "Payment", "Review"];
+  const lastStep = steps.length - 1;
+
   const displayTotals = order
     ? {
         subtotal_cents: order.subtotal_cents,
@@ -236,7 +243,7 @@ export function CheckoutWizard() {
 
   const body = (
     <>
-      <StepIndicator steps={STEPS} current={step} />
+      <StepIndicator steps={steps} current={step} />
 
       {step === 0 ? (
         <div className="mt-8 space-y-8">
@@ -287,7 +294,9 @@ export function CheckoutWizard() {
                       <input
                         type="radio"
                         name="saved-address"
-                        onChange={() =>
+                        checked={selectedAddressId === item.id}
+                        onChange={() => {
+                          setSelectedAddressId(item.id);
                           setAddress({
                             label: item.label,
                             line1: item.line1,
@@ -295,8 +304,8 @@ export function CheckoutWizard() {
                             city: item.city,
                             state: item.state,
                             zip: item.zip,
-                          })
-                        }
+                          });
+                        }}
                       />
                       <span>
                         <span className="font-medium text-navy">{item.label}</span>
@@ -309,7 +318,13 @@ export function CheckoutWizard() {
                 </div>
               </fieldset>
             ) : null}
-            <AddressFields address={address} onChange={setAddress} />
+            <AddressFields
+              address={address}
+              onChange={(next) => {
+                setSelectedAddressId(null);
+                setAddress(next);
+              }}
+            />
           </div>
           <fieldset className="space-y-3">
             <legend className="text-base font-semibold text-navy">Delivery method</legend>
@@ -408,7 +423,7 @@ export function CheckoutWizard() {
               Back
             </button>
           ) : null}
-          {step < 2 ? (
+          {step < lastStep ? (
             <button
               type="button"
               disabled={pending}

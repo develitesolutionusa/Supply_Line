@@ -12,6 +12,7 @@ export function CartView() {
   const [cart, setCart] = useState<CartResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [signedOut, setSignedOut] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +26,7 @@ export function CartView() {
           return;
         }
         setSignedOut(false);
+        setError(null);
         setCart(next);
       } catch (loadError) {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Could not load cart");
@@ -37,7 +39,7 @@ export function CartView() {
       cancelled = true;
       window.removeEventListener("cart-updated", onUpdate);
     };
-  }, []);
+  }, [retryTick]);
 
   async function changeQty(id: string, cases: number, previous: number) {
     if (!cart) return;
@@ -73,6 +75,25 @@ export function CartView() {
         href="/sign-in?redirect_url=/cart"
         cta="Sign in"
       />
+    );
+  }
+
+  if (error && !cart) {
+    return (
+      <div className="rounded-xl border border-dashed border-rose-200 bg-white p-10 text-center">
+        <h2 className="text-lg font-semibold text-navy">Could not load cart</h2>
+        <p className="mt-2 text-sm text-rose-700">{error}</p>
+        <button
+          type="button"
+          className={`${fieldClass.BUTTON} mt-6`}
+          onClick={() => {
+            setError(null);
+            setRetryTick((value) => value + 1);
+          }}
+        >
+          Try again
+        </button>
+      </div>
     );
   }
 

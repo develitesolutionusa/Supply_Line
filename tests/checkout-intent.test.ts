@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { paymentIntentCreateParams } from "../lib/stripe/payment-intent";
-import { stripeWebhookAction } from "../lib/stripe/webhook";
+import { paymentIntentAmountMatchesOrder, stripeWebhookAction } from "../lib/stripe/webhook";
 
 describe("paymentIntentCreateParams", () => {
   it("charges only the server-calculated amount and tags the order", () => {
@@ -32,7 +32,14 @@ describe("stripeWebhookAction", () => {
         type: "payment_intent.succeeded",
         data: { object: { id: "pi_1", metadata: { order_id: "ord_1" } } },
       }),
-      { action: "mark_paid", paymentIntentId: "pi_1", orderId: "ord_1" },
+      { action: "mark_paid", paymentIntentId: "pi_1", orderId: "ord_1", amount: undefined },
+    );
+    assert.deepEqual(
+      stripeWebhookAction({
+        type: "payment_intent.succeeded",
+        data: { object: { id: "pi_3", amount: 4599, metadata: { order_id: "ord_3" } } },
+      }),
+      { action: "mark_paid", paymentIntentId: "pi_3", orderId: "ord_3", amount: 4599 },
     );
     assert.deepEqual(
       stripeWebhookAction({
@@ -45,5 +52,12 @@ describe("stripeWebhookAction", () => {
       action: "ignore",
       type: "charge.succeeded",
     });
+  });
+
+  it("rejects a PaymentIntent whose amount does not match the order total", () => {
+    assert.equal(paymentIntentAmountMatchesOrder(undefined, 4599), true);
+    assert.equal(paymentIntentAmountMatchesOrder(4599, 4599), true);
+    assert.equal(paymentIntentAmountMatchesOrder(100, 4599), false);
+    assert.equal(paymentIntentAmountMatchesOrder(45.99, 4599), false);
   });
 });

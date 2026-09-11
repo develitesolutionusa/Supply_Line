@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getCartSnapshot, clearCart } from "@/lib/cart/service";
 import { notifyIfLowStockBreached } from "@/lib/inventory/alerts";
+import { assertCartHasStock } from "@/lib/inventory/stock";
 import { pageBounds } from "@/lib/pagination";
 import { DELIVERY_METHODS, requiresDeliveryLocation, resolveCasePrice } from "@/lib/pricing";
 import { ensureAppUser, ensureBusinessAccount } from "@/lib/supabase/identity";
@@ -143,6 +144,15 @@ export async function placeOrder(options: {
     throw new Error("Cart is empty");
   }
 
+  assertCartHasStock(
+    cart.items.map((item) => ({
+      sku: item.product.sku,
+      cases: item.cases,
+      quantity_on_hand: item.product.quantity_on_hand,
+      stock_status: item.product.stock_status,
+    })),
+  );
+
   const supabase = createServiceClient();
   const { user, account: business } = await syncClerkIdentity({
     clerkUserId: options.userId,
@@ -243,6 +253,12 @@ export async function markOrderPaid(orderId: string) {
       .eq("id", item.product_id)
       .maybeSingle();
     let remaining = item.cases as number;
+    const available = (inventoryRows ?? []).reduce((sum, row) => sum + row.quantity_on_hand, 0);
+    if (available < remaining) {
+      throw new Error(
+        `Insufficient stock for ${product?.sku ?? item.product_id}: ${available} on hand, ${remaining} ordered.`,
+      );
+    }
     for (const row of inventoryRows ?? []) {
       if (remaining <= 0) break;
       const take = Math.min(row.quantity_on_hand, remaining);
@@ -260,6 +276,11 @@ export async function markOrderPaid(orderId: string) {
         nextQuantity,
         threshold: row.low_stock_threshold,
       });
+    }
+    if (remaining > 0) {
+      throw new Error(
+        `Could not reserve ${remaining} case(s) for ${product?.sku ?? item.product_id}.`,
+      );
     }
   }
 

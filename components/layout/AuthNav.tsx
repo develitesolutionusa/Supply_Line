@@ -73,11 +73,16 @@ function ClerkAuthNav({ appearance, onNavigate }: AuthNavProps) {
     return <GetStartedLink appearance="toolbar" />;
   }
 
-  if (appearance === "menu") return null;
-  return <SignedInAccountMenu />;
+  return <SignedInAccountMenu appearance={appearance} onNavigate={onNavigate} />;
 }
 
-function SignedInAccountMenu() {
+function SignedInAccountMenu({
+  appearance,
+  onNavigate,
+}: {
+  appearance: "toolbar" | "menu";
+  onNavigate?: () => void;
+}) {
   const { user } = useUser();
   const { organization } = useOrganization();
   const [open, setOpen] = useState(false);
@@ -109,6 +114,39 @@ function SignedInAccountMenu() {
     hasOrganization: Boolean(organization) || (user?.organizationMemberships?.length ?? 0) > 0,
   });
   const orgName = isBusiness ? organization?.name : undefined;
+
+  if (appearance === "menu") {
+    return (
+      <nav className="flex flex-col gap-1 border-t border-slate-200 pt-3" aria-label="Account">
+        <div className="px-3 pb-2">
+          <p className="truncate text-sm font-semibold text-navy">{displayName}</p>
+          {isBusiness ? (
+            <div className="mt-3">
+              <OrganizationSwitcher
+                hidePersonal
+                afterCreateOrganizationUrl="/"
+                afterSelectOrganizationUrl="/"
+                appearance={{
+                  elements: {
+                    rootBox: "w-full",
+                    organizationSwitcherTrigger:
+                      "w-full justify-between rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-navy",
+                  },
+                }}
+              />
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-slate-500">Individual account · retail pricing</p>
+          )}
+        </div>
+        <AccountLinks
+          isBusiness={isBusiness}
+          hasOrganization={Boolean(organization)}
+          onNavigate={onNavigate}
+        />
+      </nav>
+    );
+  }
 
   return (
     <div ref={rootRef} className="relative">
@@ -159,43 +197,61 @@ function SignedInAccountMenu() {
               <p className="mt-2 text-xs text-slate-500">Individual account · retail pricing</p>
             )}
           </div>
-          <Link
-            href="/account/orders"
-            role="menuitem"
-            className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
-            onClick={() => setOpen(false)}
-          >
-            My orders
-          </Link>
-          <Link
-            href="/account"
-            role="menuitem"
-            className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
-            onClick={() => setOpen(false)}
-          >
-            Account
-          </Link>
-          {isBusiness && !organization ? (
-            <Link
-              href="/create-organization"
-              role="menuitem"
-              className="block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
-              onClick={() => setOpen(false)}
-            >
-              Create company
-            </Link>
-          ) : null}
-          <SignOutButton>
-            <button
-              type="button"
-              role="menuitem"
-              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
-            >
-              Sign out
-            </button>
-          </SignOutButton>
+          <AccountLinks
+            isBusiness={isBusiness}
+            hasOrganization={Boolean(organization)}
+            onNavigate={() => setOpen(false)}
+            asMenu
+          />
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AccountLinks({
+  isBusiness,
+  hasOrganization,
+  onNavigate,
+  asMenu = false,
+}: {
+  isBusiness: boolean;
+  hasOrganization: boolean;
+  onNavigate?: () => void;
+  asMenu?: boolean;
+}) {
+  const itemClass = asMenu
+    ? "block px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
+    : "block rounded-md px-3 py-2.5 text-sm font-medium text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky";
+
+  return (
+    <>
+      <Link href="/account/orders" role={asMenu ? "menuitem" : undefined} className={itemClass} onClick={onNavigate}>
+        My orders
+      </Link>
+      <Link href="/account" role={asMenu ? "menuitem" : undefined} className={itemClass} onClick={onNavigate}>
+        Account
+      </Link>
+      {isBusiness && !hasOrganization ? (
+        <Link
+          href="/create-organization"
+          role={asMenu ? "menuitem" : undefined}
+          className={itemClass}
+          onClick={onNavigate}
+        >
+          Create company
+        </Link>
+      ) : null}
+      <SignOutButton>
+        <button
+          type="button"
+          role={asMenu ? "menuitem" : undefined}
+          className={`${itemClass} w-full text-left text-slate-700`}
+          onClick={onNavigate}
+        >
+          Sign out
+        </button>
+      </SignOutButton>
+    </>
   );
 }

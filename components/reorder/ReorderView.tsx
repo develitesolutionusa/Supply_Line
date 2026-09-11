@@ -31,8 +31,10 @@ export function ReorderView() {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/orders?limit=50")
       .then(async (response) => {
         if (response.status === 401) {
@@ -40,10 +42,19 @@ export function ReorderView() {
           return;
         }
         const data = await response.json();
-        setOrders(data.orders ?? []);
+        if (!response.ok) throw new Error(data.error ?? "Could not load orders");
+        if (!cancelled) {
+          setError(null);
+          setOrders(data.orders ?? []);
+        }
       })
-      .catch(() => setError("Could not load orders"));
-  }, []);
+      .catch(() => {
+        if (!cancelled) setError("Could not load orders");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [retryTick]);
 
   async function selectOrder(id: string) {
     setSelected(id);
@@ -79,6 +90,25 @@ export function ReorderView() {
     } finally {
       setPending(false);
     }
+  }
+
+  if (error && !orders) {
+    return (
+      <div className="rounded-xl border border-dashed border-rose-200 bg-white p-10 text-center">
+        <h2 className="text-lg font-semibold text-navy">Could not load orders</h2>
+        <p className="mt-2 text-sm text-rose-700">{error}</p>
+        <button
+          type="button"
+          className={`${fieldClass.BUTTON} mt-6`}
+          onClick={() => {
+            setError(null);
+            setRetryTick((value) => value + 1);
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   if (!orders) return <PanelSkeleton label="Loading past orders" />;
