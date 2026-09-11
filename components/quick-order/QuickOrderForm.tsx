@@ -1,25 +1,123 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Toast } from "@/components/ui/Toast";
 import { emitCartUpdated } from "@/lib/cart/client";
 import { fieldClass } from "@/lib/ui";
 
-type Row = { id: number; sku: string; qty: string };
+type ProductOption = { sku: string; name: string };
+type Row = { id: number; sku: string; query: string; qty: string };
 type Result = { sku: string; qty: number; ok: boolean; reason?: string };
 
-export function QuickOrderForm() {
-  const [rows, setRows] = useState<Row[]>([
-    { id: 1, sku: "", qty: "1" },
-    { id: 2, sku: "", qty: "1" },
-  ]);
+function matchProducts(products: ProductOption[], query: string) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  return products
+    .filter((product) => product.name.toLowerCase().includes(needle))
+    .slice(0, 8);
+}
+
+function resolveSku(products: ProductOption[], row: Row) {
+  if (row.sku) {
+    const selected = products.find((product) => product.sku === row.sku);
+    if (selected && selected.name.toLowerCase() === row.query.trim().toLowerCase()) {
+      return selected.sku;
+    }
+  }
+  const exact = products.find((product) => product.name.toLowerCase() === row.query.trim().toLowerCase());
+  return exact?.sku ?? "";
+}
+
+function ProductSearch({
+  products,
+  row,
+  index,
+  onChange,
+}: {
+  products: ProductOption[];
+  row: Row;
+  index: number;
+  onChange: (next: Pick<Row, "sku" | "query">) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const fieldId = useId();
+  const matches = matchProducts(products, row.query);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <label className="sr-only" htmlFor={fieldId}>
+        Search product name row {index + 1}
+      </label>
+      <input
+        id={fieldId}
+        type="search"
+        autoComplete="off"
+        className={fieldClass.INPUT}
+        value={row.query}
+        placeholder="Search product name"
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          onChange({ sku: "", query: event.target.value });
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setOpen(false);
+          if (event.key === "Enter" && matches[0]) {
+            event.preventDefault();
+            onChange({ sku: matches[0].sku, query: matches[0].name });
+            setOpen(false);
+          }
+        }}
+      />
+      {open && matches.length > 0 ? (
+        <ul
+          className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+          role="listbox"
+          aria-label="Product matches"
+        >
+          {matches.map((product) => (
+            <li key={product.sku}>
+              <button
+                type="button"
+                role="option"
+                className="flex w-full px-3 py-2 text-left text-sm text-navy hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-inset"
+                onClick={() => {
+                  onChange({ sku: product.sku, query: product.name });
+                  setOpen(false);
+                }}
+              >
+                {product.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {open && row.query.trim() && matches.length === 0 ? (
+        <p className="mt-1 text-xs text-slate-500">No products match that name.</p>
+      ) : null}
+    </div>
+  );
+}
+
+export function QuickOrderForm({ products }: { products: ProductOption[] }) {
+  const [rows, setRows] = useState<Row[]>([{ id: 1, sku: "", query: "", qty: "1" }]);
   const [results, setResults] = useState<Result[] | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function addRow() {
-    setRows((current) => [...current, { id: Date.now(), sku: "", qty: "1" }]);
+    setRows((current) => [...current, { id: Date.now(), sku: "", query: "", qty: "1" }]);
   }
 
   function removeRow(id: number) {
@@ -32,8 +130,8 @@ export function QuickOrderForm() {
     setResults(null);
     try {
       const payload = rows
-        .filter((row) => row.sku.trim())
-        .map((row) => ({ sku: row.sku.trim(), qty: Number(row.qty) }));
+        .map((row) => ({ sku: resolveSku(products, row), qty: Number(row.qty) }))
+        .filter((row) => row.sku);
       const response = await fetch("/api/quick-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,7 +159,7 @@ export function QuickOrderForm() {
         <table className="w-full min-w-[32rem] text-left text-sm">
           <thead className="bg-canvas text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-3">SKU</th>
+              <th className="px-4 py-3">Product name</th>
               <th className="px-4 py-3">Cases</th>
               <th className="px-4 py-3">
                 <span className="sr-only">Row actions</span>
@@ -70,27 +168,20 @@ export function QuickOrderForm() {
           </thead>
           <tbody>
             {rows.map((row, index) => {
-              const result = results?.find(
-                (item) => item.sku.toLowerCase() === row.sku.trim().toLowerCase(),
-              );
+              const sku = resolveSku(products, row);
+              const result = results?.find((item) => item.sku.toLowerCase() === sku.toLowerCase());
               return (
                 <tr key={row.id} className="border-t border-slate-100">
                   <td className="px-4 py-3">
-                    <label className="sr-only" htmlFor={`sku-${row.id}`}>
-                      SKU row {index + 1}
-                    </label>
-                    <input
-                      id={`sku-${row.id}`}
-                      className={fieldClass.INPUT}
-                      value={row.sku}
-                      onChange={(event) =>
+                    <ProductSearch
+                      products={products}
+                      row={row}
+                      index={index}
+                      onChange={(next) =>
                         setRows((current) =>
-                          current.map((item) =>
-                            item.id === row.id ? { ...item, sku: event.target.value } : item,
-                          ),
+                          current.map((item) => (item.id === row.id ? { ...item, ...next } : item)),
                         )
                       }
-                      placeholder="PLS-DELI-32"
                     />
                     {result && !result.ok ? (
                       <p className="mt-1 text-xs text-rose-700">{result.reason}</p>
@@ -133,11 +224,7 @@ export function QuickOrderForm() {
       </div>
       {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
       <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
-          className={fieldClass.GHOST}
-          onClick={addRow}
-        >
+        <button type="button" className={fieldClass.GHOST} onClick={addRow}>
           Add another product
         </button>
         <button
